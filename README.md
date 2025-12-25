@@ -145,6 +145,11 @@ generateFailure('processError', 'userNotFound', { userId: '123' });
 - Observability is built-in, not bolted on
 - No exceptions in business code
 
+## Documentation
+
+- **API reference** → `docs/api.md`
+- **Usage patterns & examples** → `docs/examples.md`
+
 ## Contributing
 
 Contributions are welcome.
