@@ -1,5 +1,6 @@
 import z from 'zod';
 import {
+    Error,
     generateError,
     Message,
     messageSchema,
@@ -194,8 +195,8 @@ export class Success<S> extends PureResult<S> {
 }
 
 export class Failure extends PureResult<never> {
-    private readonly errors: Message[] = [];
-    constructor(...errors: Message[]) {
+    private readonly errors: Error[] = [];
+    constructor(...errors: Error[]) {
         super();
         this.addErrors(errors);
     }
@@ -204,11 +205,11 @@ export class Failure extends PureResult<never> {
     //#region                            ERROR MANAGEMENT                          #
     //#────────────────────────────────────────────────────────────────────────────#
 
-    public getErrors(): Message[] {
+    public getErrors(): Error[] {
         return structuredClone(this.errors);
     }
 
-    public addErrors(errors: Message[]): this {
+    public addErrors(errors: Error[]): this {
         for (let error of errors) {
             const zodParseResult = messageSchema.safeParse(error);
             if (!zodParseResult.success) {

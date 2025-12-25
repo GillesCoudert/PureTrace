@@ -9,6 +9,11 @@ export const messageSchema = z.object({
 
 export type Message = z.infer<typeof messageSchema>;
 
+export const errorSchema = messageSchema.extend({
+    kind: z.literal('error'),
+});
+export type Error = z.infer<typeof errorSchema>;
+
 //#────────────────────────────────────────────────────────────────────────────#
 //#region                              NATIVE ERRORS                           #
 //#────────────────────────────────────────────────────────────────────────────#
@@ -41,8 +46,8 @@ export type NativeErrorData<T extends NativeErrorType> = z.infer<
 export function generateError<T extends NativeErrorType>(
     type: T,
     code: string,
-    data: NativeErrorData<T>,
-): Message {
+    data?: NativeErrorData<T>,
+): Error {
     return {
         kind: 'error',
         type,
@@ -64,14 +69,7 @@ export function generateError<T extends NativeErrorType>(
 //#region    ───── DEFINITIONS ─────
 
 const nativeMessageDefinitions = {
-    error: {
-        pureTraceInternalError: z.object({
-            message: z.looseObject({}),
-            zodError: z.looseObject({}),
-        }),
-        technicalIssue: z.json(),
-        processError: z.json(),
-    },
+    error: nativeErrorDefinitions,
     information: {
         warning: z.json(),
         information: z.json(),
@@ -102,7 +100,7 @@ type NativeMessageData<
 export function generateMessage<
     K extends NativeMessageKind,
     T extends NativeMessageType<K>,
->(kind: K, type: T, code: string, data: NativeMessageData<K, T>): Message {
+>(kind: K, type: T, code: string, data?: NativeMessageData<K, T>): Message {
     return {
         kind,
         type,
