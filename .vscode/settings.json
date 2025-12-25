@@ -1,0 +1,238 @@
+{
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+        "source.removeUnusedImports": "explicit",
+        "source.fixAll.eslint": "explicit"
+    },
+    "cucumberautocomplete.steps": ["tests/steps/*.steps.ts"],
+    "cucumberautocomplete.syncfeatures": "tests/features/*.feature",
+    // Better commments
+    "better-comments.tags": [
+        {
+            "tag": "%",
+            "color": "#FF00FF",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "transparent",
+            "bold": true,
+            "italic": false
+        },
+        {
+            "tag": "!",
+            "color": "#FF2D00",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "transparent",
+            "bold": false,
+            "italic": false
+        },
+        {
+            "tag": "?",
+            "color": "#3498DB",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "transparent",
+            "bold": false,
+            "italic": false
+        },
+        {
+            "tag": "//",
+            "color": "#474747",
+            "strikethrough": true,
+            "underline": false,
+            "backgroundColor": "transparent",
+            "bold": false,
+            "italic": false
+        },
+        {
+            "tag": "todo",
+            "color": "#FF8C00",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "transparent",
+            "bold": false,
+            "italic": false
+        },
+        {
+            "tag": "*",
+            "color": "#98C379",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "transparent",
+            "bold": false,
+            "italic": false
+        },
+        {
+            "tag": ">",
+            "color": "#21ada9",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "transparent",
+            "bold": true,
+            "italic": false
+        },
+        {
+            "tag": "#",
+            "color": "#B200FF",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "transparent",
+            "bold": true,
+            "italic": false
+        }
+    ],
+    // Comment box
+    "commentBox.styles": {
+        "algorithmStyle": {
+            "capitalize": false,
+            "textAlignment": "left",
+            "ignoreInnerIndentation": false,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 0,
+            "commentStartToken": "//>",
+            "commentEndToken": "─<",
+            "leftEdgeToken": "//> ",
+            "rightEdgeToken": " <",
+            "topEdgeToken": "─",
+            "bottomEdgeToken": "─",
+            "topRightToken": "─<",
+            "bottomLeftToken": "//>"
+        },
+        "headerStyle": {
+            "capitalize": true,
+            "textAlignment": "left",
+            "ignoreInnerIndentation": true,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 0,
+            "commentStartToken": "//",
+            "commentEndToken": "───",
+            "leftEdgeToken": "// * ",
+            "rightEdgeToken": " * ",
+            "topEdgeToken": "─",
+            "bottomEdgeToken": "─",
+            "topRightToken": "───",
+            "bottomLeftToken": "//"
+        },
+        "algorithmHeaderStyle": {
+            "capitalize": true,
+            "textAlignment": "center",
+            "ignoreInnerIndentation": true,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 0,
+            "commentStartToken": "//>",
+            "commentEndToken": "",
+            "leftEdgeToken": "//> ─── ",
+            "rightEdgeToken": " ───",
+            "topEdgeToken": " ",
+            "bottomEdgeToken": " ",
+            "topRightToken": "",
+            "bottomLeftToken": "//>"
+        },
+        "algorithmCommentStyle": {
+            "capitalize": false,
+            "textAlignment": "center",
+            "ignoreInnerIndentation": false,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 0,
+            "commentStartToken": "//>",
+            "commentEndToken": "",
+            "leftEdgeToken": "//> > fr: ",
+            "rightEdgeToken": "",
+            "topEdgeToken": " ",
+            "bottomEdgeToken": " ",
+            "topRightToken": "",
+            "bottomLeftToken": "//>"
+        },
+        "algorithmCaseStyle": {
+            "capitalize": false,
+            "textAlignment": "center",
+            "ignoreInnerIndentation": false,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 0,
+            "commentStartToken": "//> ?! ",
+            "commentEndToken": " ?!",
+            "leftEdgeToken": "//> ?! fr: ",
+            "rightEdgeToken": " ?!",
+            "topEdgeToken": "─",
+            "bottomEdgeToken": "─",
+            "topRightToken": " ?!",
+            "bottomLeftToken": "//> ?! "
+        },
+        "algorithmLoopStyle": {
+            "capitalize": false,
+            "textAlignment": "center",
+            "ignoreInnerIndentation": false,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 0,
+            "commentStartToken": "//> ↓↑ ",
+            "commentEndToken": " ↓↑",
+            "leftEdgeToken": "//> ↓↑ ",
+            "rightEdgeToken": " ↓↑",
+            "topEdgeToken": "─",
+            "bottomEdgeToken": "─",
+            "topRightToken": " ↓↑",
+            "bottomLeftToken": "//> ↓↑ "
+        },
+        "regionStartStyle": {
+            "capitalize": true,
+            "textAlignment": "center",
+            "ignoreInnerIndentation": false,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 80,
+            "commentStartToken": "//#─",
+            "commentEndToken": "─#",
+            "leftEdgeToken": "//#region    ",
+            "rightEdgeToken": " #",
+            "topEdgeToken": "─",
+            "bottomEdgeToken": "─",
+            "topRightToken": "─#",
+            "bottomLeftToken": "//#"
+        },
+        "regionEndStyle": {
+            "capitalize": true,
+            "textAlignment": "center",
+            "ignoreInnerIndentation": false,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 80,
+            "commentStartToken": "//#─",
+            "commentEndToken": "─#",
+            "leftEdgeToken": "//#endregion ",
+            "rightEdgeToken": " #",
+            "topEdgeToken": "─",
+            "bottomEdgeToken": "─",
+            "topRightToken": "─#",
+            "bottomLeftToken": "//#─"
+        },
+        "subRegionStartStyle": {
+            "capitalize": true,
+            "textAlignment": "left",
+            "ignoreInnerIndentation": false,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 0,
+            "commentStartToken": "//#region    ───── ",
+            "commentEndToken": " ─────",
+            "leftEdgeToken": "",
+            "rightEdgeToken": "",
+            "topEdgeToken": "",
+            "bottomEdgeToken": "",
+            "topRightToken": "",
+            "bottomLeftToken": ""
+        },
+        "subRegionEndStyle": {
+            "capitalize": true,
+            "textAlignment": "left",
+            "ignoreInnerIndentation": false,
+            "ignoreOuterIndentation": false,
+            "boxWidth": 0,
+            "commentStartToken": "//#endregion ───── ",
+            "commentEndToken": " ─────",
+            "leftEdgeToken": "",
+            "rightEdgeToken": "",
+            "topEdgeToken": "",
+            "bottomEdgeToken": "",
+            "topRightToken": "",
+            "bottomLeftToken": ""
+        }
+    }
+}

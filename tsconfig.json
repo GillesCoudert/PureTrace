@@ -1,0 +1,10 @@
+{
+    "extends": "@tsconfig/node24/tsconfig.json",
+
+    "compilerOptions": {
+        "outDir": "./lib",
+        "removeComments": true,
+        "esModuleInterop": true,
+        "isolatedModules": true
+    }
+}

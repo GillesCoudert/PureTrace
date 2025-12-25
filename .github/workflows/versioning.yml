@@ -1,0 +1,62 @@
+name: Versioning
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+jobs:
+  versioning:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.VERSIONING_APP_ID }}
+          private-key: ${{ secrets.VERSIONING_APP_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git
+        run: |
+          git config user.name "gilles-coudert-versioning-bot[bot]"
+          git config user.email "gilles-coudert-versioning-bot[bot]@users.noreply.github.com"
+
+      - name: Increment version on main
+        id: increment_version
+        run: |
+          echo Merged branch name : $BRANCH_NAME
+          case $BRANCH_NAME in
+            upgrade/*)
+                echo New upgrade detected.
+                NEW_VERSION=$(npm version major --no-git-tag-version)
+                ;;
+            us/*)
+                echo New epic detected.
+                NEW_VERSION=$(npm version minor --no-git-tag-version)
+                ;;
+            *)
+                echo New fix detected.
+                NEW_VERSION=$(npm version patch --no-git-tag-version)
+                ;;
+          esac
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+
+      - name: Commit & tag
+        run: |
+          git add .
+          git commit -m "Update version"
+          git tag ${{ steps.increment_version.outputs.new_version }}
+          git push && git push --tags
