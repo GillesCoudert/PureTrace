@@ -2,6 +2,7 @@
     "extends": "@tsconfig/node24/tsconfig.json",
 
     "compilerOptions": {
+        "declaration": true,
         "outDir": "./lib",
         "removeComments": true,
         "esModuleInterop": true,
