@@ -1,9 +1,9 @@
 import { Message } from './pure_message';
 import { Success, Failure, generateFailure, Result } from './pure_result';
 
-type ResultAsyncValue<S> = PromiseLike<Success<S>>;
+export type ResultAsyncValue<S> = PromiseLike<Success<S>>;
 
-interface ResultAsyncHelpers {
+export interface ResultAsyncHelpers {
     liftResult<S>(result: Result<S>): ResultAsyncValue<S>;
     liftSuccess<S>(value: S): ResultAsyncValue<S>;
     fromResultPromise<S>(promise: PromiseLike<Result<S>>): ResultAsyncValue<S>;
@@ -42,7 +42,7 @@ const resultAsyncHelpers: ResultAsyncHelpers = {
     },
 };
 
-interface ResultAsync<S> extends PromiseLike<Result<S>> {
+export interface ResultAsync<S> extends PromiseLike<Result<S>> {
     resolve(): Promise<Result<S>>;
     tap(f: (result: Result<S>) => void): ResultAsync<S>;
     mapSuccess<S2>(onSuccess: (value: S) => Success<S2>): ResultAsync<S2>;
