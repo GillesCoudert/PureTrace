@@ -182,7 +182,7 @@ interface ResultAsyncFactory {
     ): ResultAsync<S>;
 }
 
-const ResultAsync: ResultAsyncFactory = Object.assign(
+export const ResultAsync: ResultAsyncFactory = Object.assign(
     <S>(
         compute: (helpers: ResultAsyncHelpers) => ResultAsyncValue<S>,
     ): ResultAsync<S> => new ResultAsyncImpl(compute),
