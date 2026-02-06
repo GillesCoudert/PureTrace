@@ -1,12 +1,38 @@
+/* eslint-disable @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/only-throw-error */
 import { Message } from './pure_message';
 import { Success, Failure, generateFailure, Result } from './pure_result';
 
 export type ResultAsyncValue<S> = PromiseLike<Success<S>>;
 
 export interface ResultAsyncHelpers {
+    /**
+     * Lifts a Result into a ResultAsyncValue.
+     * @param result - The Result to lift.
+     * @returns A ResultAsyncValue wrapping the Success value.
+     */
     liftResult<S>(result: Result<S>): ResultAsyncValue<S>;
+
+    /**
+     * Lifts a value into a ResultAsyncValue as a Success.
+     * @param value - The value to lift.
+     * @returns A ResultAsyncValue wrapping the Success value.
+     */
     liftSuccess<S>(value: S): ResultAsyncValue<S>;
+
+    /**
+     * Converts a Promise of a Result into a ResultAsyncValue.
+     * @param promise - The Promise to convert.
+     * @returns A ResultAsyncValue wrapping the Success value.
+     */
     fromResultPromise<S>(promise: PromiseLike<Result<S>>): ResultAsyncValue<S>;
+
+    /**
+     * Converts a Promise into a ResultAsyncValue, using a failure handler for errors.
+     * @param promise - The Promise to convert.
+     * @param failure - A function to generate a Failure from an error.
+     * @returns A ResultAsyncValue wrapping the Success value or Failure.
+     */
     fromPromise<S>(
         promise: PromiseLike<S>,
         failure: (reason: unknown) => Failure,
@@ -18,7 +44,7 @@ const resultAsyncHelpers: ResultAsyncHelpers = {
         if (result.isSuccess()) {
             return Promise.resolve(result as Success<S>);
         }
-        throw result as Failure;
+        throw result;
     },
     liftSuccess<S>(value: S): ResultAsyncValue<S> {
         return Promise.resolve(new Success(value));

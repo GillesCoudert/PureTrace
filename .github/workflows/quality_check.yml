@@ -1,24 +1,24 @@
 name: Quality Check
 
 on:
-  pull_request: 
-    branches:
-      - main
+    pull_request:
+        branches:
+            - main
 
 jobs:
-  check-quality:
+    check-quality:
+        runs-on: ubuntu-latest
 
-    runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
 
-    steps:
-      - uses: actions/checkout@v6
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  registry-url: 'https://registry.npmjs.org'
+                  cache: 'npm'
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: "https://registry.npmjs.org"
-          cache: "npm"
-
-      - run: npm ci
-      - run: npm run build
-      - run: npm run test -- --logHeapUsage
+            - run: npm ci
+            - run: npm run lint
+            - run: npm run build
+            - run: npm run test -- --logHeapUsage

@@ -208,6 +208,8 @@ type Message = {
     type: string;
     code: string;
     data?: unknown;
+    issuer?: string; // (optionnel) Qui a émis le message
+    localizedMessage?: string; // (optionnel) Message localisé pour l'utilisateur
 };
 ```
 
@@ -221,29 +223,33 @@ The following helpers are **recommended** when using PureTrace native message ty
 
 ### generateMessage
 
-Creates a native non-error Message (trace, information, metric).
+Creates a native non-error Message (trace, information, metric) with optional issuer and localizedMessage.
 
 ```ts
-generateMessage<K, T>(
-  kind: K,
-  type: T,
-  code: string,
-  data: NativeMessageData<K, T>,
-): Message
+generateMessage<K, T>(options: {
+  kind: K;
+  type: T;
+  code: string;
+  data?: NativeMessageData<K, T>;
+  issuer?: string;
+  localizedMessage?: string;
+}): Message
 ```
 
 ---
 
 ### generateError
 
-Creates a native error Message without wrapping it in a Failure.
+Creates a native error Message without wrapping it in a Failure, with optional issuer and localizedMessage.
 
 ```ts
-generateError<T>(
-  type: NativeErrorType,
-  code: string,
-  data: NativeErrorData<T>,
-): Message
+generateError<T>(options: {
+  type: NativeErrorType;
+  code: string;
+  data?: NativeErrorData<T>;
+  issuer?: string;
+  localizedMessage?: string;
+}): Message
 ```
 
 Intended for advanced use cases where errors are assembled manually.
@@ -258,7 +264,9 @@ Creates a Failure containing a native error Message.
 generateFailure<T>(
   type: NativeErrorType,
   code: string,
-  data: NativeErrorData<T>,
+  data?: NativeErrorData<T>,
+  issuer?: string,
+  localizedMessage?: string,
 ): Failure
 ```
 

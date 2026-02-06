@@ -129,9 +129,11 @@ const result = await ResultAsync.fromPromise(
 ```ts
 const result = processOrder(order).tap((r) => {
     r.addTraces(
-        generateMessage('metric', 'start', 'orderProcessingStarted', {
-            orderId: order.id,
-            timestamp: Date.now(),
+        generateMessage({
+            kind: 'metric',
+            type: 'start',
+            code: 'orderProcessingStarted',
+            data: { orderId: order.id, timestamp: Date.now() },
         }),
     );
 });
@@ -140,9 +142,11 @@ const result = processOrder(order).tap((r) => {
 ```ts
 const result = processOrder(order).tap((r) => {
     r.addTraces(
-        generateMessage('metric', 'stop', 'orderProcessingFinished', {
-            orderId: order.id,
-            timestamp: Date.now(),
+        generateMessage({
+            kind: 'metric',
+            type: 'stop',
+            code: 'orderProcessingFinished',
+            data: { orderId: order.id, timestamp: Date.now() },
         }),
     );
 });
@@ -170,14 +174,12 @@ async function fetchWithRetry<T>(
         if (result.isSuccess()) {
             return result.tap((r) =>
                 r.addTraces(
-                    generateMessage(
-                        'information',
-                        'information',
-                        'retrySucceeded',
-                        {
-                            attempt,
-                        },
-                    ),
+                    generateMessage({
+                        kind: 'information',
+                        type: 'information',
+                        code: 'retrySucceeded',
+                        data: { attempt },
+                    }),
                 ),
             );
         }
@@ -186,8 +188,11 @@ async function fetchWithRetry<T>(
     }
 
     return lastFailure!.addTraces(
-        generateMessage('information', 'information', 'retryExhausted', {
-            retries,
+        generateMessage({
+            kind: 'information',
+            type: 'information',
+            code: 'retryExhausted',
+            data: { retries },
         }),
     );
 }

@@ -56,7 +56,7 @@ if (result.isSuccess()) {
 ## Mental model
 
 - A **Result** is either `Success<S>` or `Failure`
-- A **Failure** contains **error messages**
+- A **Failure** contains **error message**
 - Both Success and Failure can accumulate **trace messages**
 - Errors are just messages with `kind: "error"`
 
@@ -68,6 +68,8 @@ type Message = {
     type: string;
     code: string;
     data?: unknown;
+    issuer?: string; // optional: who emitted the message
+    localizedMessage?: string; // optional: localized user message
 };
 ```
 
@@ -78,7 +80,13 @@ type Message = {
 ```ts
 const ok = new Success(42);
 
-const ko = generateFailure('processError', 'notFound', { id: '123' });
+const ko = generateFailure(
+    'processError',
+    'notFound',
+    { id: '123' },
+    'userService', // issuer (optional)
+    'Utilisateur non trouvé.', // localizedMessage (optional)
+);
 ```
 
 ### Compose (sync)
@@ -100,10 +108,30 @@ import { generateMessage } from '@gilles-coudert/pure-trace';
 
 const traced = parseAge('25').tap((r) => {
     r.addTraces(
-        generateMessage('information', 'information', 'ageParsed', {
-            input: '25',
-        }),
+        generateMessage(
+            'information',
+            'information',
+            'ageParsed',
+            { input: '25' },
+            'userService', // issuer (optional)
+            'Âge analysé avec succès.', // localizedMessage (optional)
+        ),
     );
+});
+```
+
+### Enrich error messages
+
+You can add issuer to errors and traces:
+
+```ts
+import { generateError } from '@gilles-coudert/pure-trace';
+
+const error = generateError({
+    type: 'processError',
+    code: 'invalidAgeFormat',
+    data: { input: 'abc' },
+    issuer: 'userService', // optional
 });
 ```
 
@@ -136,6 +164,21 @@ generateFailure('processError', 'userNotFound', { userId: '123' });
 
 // en: "User {userId} not found"
 // fr: "L'utilisateur {userId} n'a pas été trouvé"
+```
+
+Sometimes, translations have to be done at the source.
+In these cases, the localized message can be specified directly.
+
+```ts
+import { generateError } from '@gilles-coudert/pure-trace';
+
+const error = generateError({
+    type: 'processError',
+    code: 'invalidAgeFormat',
+    data: { input: 'abc' },
+    issuer: 'userService', // optional
+    localizedMessage: "L'âge indiqué est incorrect.",
+});
 ```
 
 ## What makes PureTrace different?
