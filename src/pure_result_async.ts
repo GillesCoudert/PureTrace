@@ -56,7 +56,7 @@ const resultAsyncHelpers: ResultAsyncHelpers = {
     },
     fromPromise<S>(
         promise: PromiseLike<S>,
-        failure: (reason: unknown) => Failure,
+        failure: ((reason: unknown) => Failure) | Failure,
     ): ResultAsyncValue<S> {
         return promise.then(
             (value) => resultAsyncHelpers.liftSuccess(value),
@@ -102,8 +102,12 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
             if (e instanceof Failure) {
                 return e;
             }
-            return generateFailure('technicalIssue', 'uncatchedException', {
-                message: JSON.stringify(e),
+            return generateFailure({
+                type: 'technicalIssue',
+                code: 'uncaughtException',
+                data: {
+                    message: JSON.stringify(e),
+                },
             });
         }
     }
