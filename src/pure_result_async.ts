@@ -102,8 +102,12 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
             if (e instanceof Failure) {
                 return e;
             }
-            return generateFailure('technicalIssue', 'uncatchedException', {
-                message: JSON.stringify(e),
+            return generateFailure({
+                type: 'technicalIssue',
+                code: 'uncatchedException',
+                data: {
+                    message: JSON.stringify(e),
+                },
             });
         }
     }

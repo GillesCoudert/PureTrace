@@ -424,22 +424,14 @@ export class Failure extends PureResult<never> {
  * @param localizedMessage Optional localized message.
  * @returns A Failure instance.
  */
-export function generateFailure<T extends NativeErrorType>(
-    type: T,
-    code: string,
-    data: NativeErrorData<T>,
-    issuer?: string,
-    localizedMessage?: string,
-): Failure {
-    return new Failure(
-        generateError({
-            type,
-            code,
-            data,
-            issuer,
-            localizedMessage,
-        }),
-    );
+export function generateFailure<T extends NativeErrorType>(parameters: {
+    type: T;
+    code: string;
+    data: NativeErrorData<T>;
+    issuer?: string;
+    localizedMessage?: string;
+}): Failure {
+    return new Failure(generateError(parameters));
 }
 
 /**
