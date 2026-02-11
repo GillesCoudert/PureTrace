@@ -427,7 +427,7 @@ export class Failure extends PureResult<never> {
 export function generateFailure<T extends NativeErrorType>(parameters: {
     type: T;
     code: string;
-    data: NativeErrorData<T>;
+    data?: NativeErrorData<T>;
     issuer?: string;
     localizedMessage?: string;
 }): Failure {
