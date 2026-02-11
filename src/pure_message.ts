@@ -43,8 +43,8 @@ type NativeErrorDefinitions = {
         },
         z.core.$strip
     >;
-    readonly technicalIssue: z.ZodJSONSchema;
-    readonly processError: z.ZodJSONSchema;
+    readonly technicalIssue: z.ZodUnion<[z.ZodJSONSchema, z.ZodUndefined]>;
+    readonly processError: z.ZodUnion<[z.ZodJSONSchema, z.ZodUndefined]>;
 };
 
 /**
