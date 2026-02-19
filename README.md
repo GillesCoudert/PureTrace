@@ -15,6 +15,7 @@ Use PureTrace if you want:
 - **End-to-end traceability** carried by the Result itself
 - **i18n-ready errors** (codes + structured data)
 - **One mental model** for sync and async flows
+- **Seamless Zod integration** for schema validation
 
 PureTrace is designed for applications where errors are part of the domain, not just technical failures.
 
@@ -51,6 +52,42 @@ if (result.isSuccess()) {
     console.error(result.getErrors());
     console.log(result.getTraces());
 }
+```
+
+## Zod integration
+
+PureTrace provides seamless integration with [Zod](https://zod.dev/) for data validation:
+
+```ts
+import { pureZodParse } from '@gilles-coudert/pure-trace';
+import z from 'zod';
+
+const userSchema = z.object({
+    name: z.string(),
+    age: z.number(),
+});
+
+const result = pureZodParse({ name: 'Alice', age: 25 }, userSchema);
+
+if (result.isSuccess()) {
+    console.log(result.value); // { name: 'Alice', age: 25 }
+} else {
+    console.error(result.getErrors()); // Structured error messages
+}
+```
+
+Custom validation errors are preserved:
+
+```ts
+const schema = z.object({
+    age: z.number().refine((val) => val >= 18, {
+        message: 'userTooYoung',
+        params: { minAge: 18 },
+    }),
+});
+
+const result = pureZodParse({ age: 15 }, schema);
+// Error code: 'userTooYoung', data: { minAge: 18 }
 ```
 
 ## Mental model

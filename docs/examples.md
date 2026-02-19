@@ -243,6 +243,149 @@ const tolerant = GetResult.fromResultArrayAsSuccess(results);
 
 ---
 
+## Zod validation with custom errors
+
+```ts
+import { pureZodParse } from '@gilles-coudert/pure-trace';
+import z from 'zod';
+
+const registrationSchema = z.object({
+    username: z.string().min(3).max(20),
+    email: z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/),
+    age: z.number().refine((val) => val >= 18, {
+        message: 'USER_TOO_YOUNG',
+        params: { minAge: 18 },
+    }),
+});
+
+function registerUser(data: unknown): Result<{ username: string; email: string; age: number }> {
+    return pureZodParse(data, registrationSchema)
+        .tap((r) => {
+            if (r.isFailure()) {
+                r.addTraces(
+                    generateMessage({
+                        kind: 'information',
+                        type: 'warning',
+                        code: 'registrationFailed',
+                        data: { errors: r.getErrors() },
+                    }),
+                );
+            }
+        });
+}
+
+const result = registerUser({ username: 'ab', email: 'bad', age: 15 });
+
+if (result.isFailure()) {
+    const errors = result.getErrors();
+    // Error codes include: 'USER_TOO_YOUNG', 'zodParseFailed'
+    // Generic validation errors are aggregated
+}
+```
+
+---
+
+## Combining Zod validation with business rules
+
+```ts
+import { pureZodParse } from '@gilles-coudert/pure-trace';
+import z from 'zod';
+
+const userSchema = z.object({
+    email: z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/),
+    role: z.enum(['admin', 'user', 'guest']),
+});
+
+function checkEmailDomain(email: string): Result<string> {
+    const allowedDomains = ['company.com', 'partner.com'];
+    const domain = email.split('@')[1];
+
+    return allowedDomains.includes(domain)
+        ? new Success(email)
+        : generateFailure('processError', 'INVALID_EMAIL_DOMAIN', {
+              email,
+              domain,
+              allowedDomains,
+          });
+}
+
+function checkRolePermission(role: string): Result<string> {
+    return role === 'guest'
+        ? generateFailure('processError', 'GUEST_REGISTRATION_DISABLED', {
+              role,
+          })
+        : new Success(role);
+}
+
+function validateRegistration(data: unknown): Result<{ email: string; role: string }> {
+    return pureZodParse(data, userSchema)
+        .chainSuccess((user) =>
+            checkEmailDomain(user.email)
+                .chainSuccess(() => checkRolePermission(user.role))
+                .mapSuccess(() => new Success(user)),
+        );
+}
+
+const result = validateRegistration({ email: 'user@external.com', role: 'user' });
+
+if (result.isFailure()) {
+    // Could fail at schema validation, domain check, or role check
+    console.log(result.getErrors());
+}
+```
+
+---
+
+## Transforming Zod results for API responses
+
+```ts
+import { pureZodParse } from '@gilles-coudert/pure-trace';
+import z from 'zod';
+
+const apiRequestSchema = z.object({
+    action: z.enum(['create', 'update', 'delete']),
+    payload: z.record(z.unknown()),
+});
+
+function handleApiRequest(rawData: unknown): Result<{ action: string; payload: Record<string, unknown> }> {
+    return pureZodParse(rawData, apiRequestSchema)
+        .mapFailure((errors) => {
+            // Transform validation errors for API response
+            const apiErrors = errors.map((err) =>
+                generateError({
+                    type: 'processError',
+                    code: 'INVALID_REQUEST',
+                    data: {
+                        originalCode: err.code,
+                        originalData: err.data,
+                    },
+                    localizedMessage: 'The request format is invalid.',
+                }),
+            );
+            return new Failure(...apiErrors);
+        })
+        .tap((r) => {
+            r.addTraces(
+                generateMessage({
+                    kind: 'metric',
+                    type: 'start',
+                    code: 'requestValidated',
+                    data: { timestamp: Date.now() },
+                }),
+            );
+        });
+}
+
+const result = handleApiRequest({ action: 'invalid', payload: {} });
+
+if (result.isFailure()) {
+    const errors = result.getErrors();
+    // All errors have code 'INVALID_REQUEST' with original error details in data
+}
+```
+
+---
+
 ## Design guidance
 
 - Prefer small Result-returning functions
