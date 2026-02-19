@@ -172,8 +172,8 @@ async function fetchWithRetry<T>(
         );
 
         if (result.isSuccess()) {
-            return result.tap((r) =>
-                r.addTraces(
+            return result.mapSuccess((value) =>
+                new Success(value).addTraces(
                     generateMessage({
                         kind: 'information',
                         type: 'information',
@@ -253,32 +253,32 @@ const registrationSchema = z.object({
     username: z.string().min(3).max(20),
     email: z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/),
     age: z.number().refine((val) => val >= 18, {
-        message: 'USER_TOO_YOUNG',
+        message: 'userTooYoung',
         params: { minAge: 18 },
     }),
 });
 
-function registerUser(data: unknown): Result<{ username: string; email: string; age: number }> {
-    return pureZodParse(data, registrationSchema)
-        .tap((r) => {
-            if (r.isFailure()) {
-                r.addTraces(
-                    generateMessage({
-                        kind: 'information',
-                        type: 'warning',
-                        code: 'registrationFailed',
-                        data: { errors: r.getErrors() },
-                    }),
-                );
-            }
-        });
+function registerUser(
+    data: unknown,
+): Result<{ username: string; email: string; age: number }> {
+    return pureZodParse(data, registrationSchema).mapFailure((errors) =>
+        new Failure(...errors).addTraces(
+            generateMessage({
+                kind: 'information',
+                type: 'warning',
+                code: 'registrationValidationFailed',
+                data: { timestamp: Date.now() },
+                issuer: 'userService',
+            }),
+        ),
+    );
 }
 
 const result = registerUser({ username: 'ab', email: 'bad', age: 15 });
 
 if (result.isFailure()) {
     const errors = result.getErrors();
-    // Error codes include: 'USER_TOO_YOUNG', 'zodParseFailed'
+    // Error codes include: 'userTooYoung', 'zodParseFailed'
     // Generic validation errors are aggregated
 }
 ```
@@ -317,16 +317,20 @@ function checkRolePermission(role: string): Result<string> {
         : new Success(role);
 }
 
-function validateRegistration(data: unknown): Result<{ email: string; role: string }> {
-    return pureZodParse(data, userSchema)
-        .chainSuccess((user) =>
-            checkEmailDomain(user.email)
-                .chainSuccess(() => checkRolePermission(user.role))
-                .mapSuccess(() => new Success(user)),
-        );
+function validateRegistration(
+    data: unknown,
+): Result<{ email: string; role: string }> {
+    return pureZodParse(data, userSchema).chainSuccess((user) =>
+        checkEmailDomain(user.email)
+            .chainSuccess(() => checkRolePermission(user.role))
+            .mapSuccess(() => new Success(user)),
+    );
 }
 
-const result = validateRegistration({ email: 'user@external.com', role: 'user' });
+const result = validateRegistration({
+    email: 'user@external.com',
+    role: 'user',
+});
 
 if (result.isFailure()) {
     // Could fail at schema validation, domain check, or role check
@@ -347,7 +351,9 @@ const apiRequestSchema = z.object({
     payload: z.record(z.unknown()),
 });
 
-function handleApiRequest(rawData: unknown): Result<{ action: string; payload: Record<string, unknown> }> {
+function handleApiRequest(
+    rawData: unknown,
+): Result<{ action: string; payload: Record<string, unknown> }> {
     return pureZodParse(rawData, apiRequestSchema)
         .mapFailure((errors) => {
             // Transform validation errors for API response
@@ -364,16 +370,16 @@ function handleApiRequest(rawData: unknown): Result<{ action: string; payload: R
             );
             return new Failure(...apiErrors);
         })
-        .tap((r) => {
-            r.addTraces(
+        .mapSuccess((value) =>
+            new Success(value).addTraces(
                 generateMessage({
                     kind: 'metric',
                     type: 'start',
                     code: 'requestValidated',
                     data: { timestamp: Date.now() },
                 }),
-            );
-        });
+            ),
+        );
 }
 
 const result = handleApiRequest({ action: 'invalid', payload: {} });
