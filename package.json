@@ -13,7 +13,7 @@
     ],
     "scripts": {
         "prebuild": "node -e \"require('fs').rmSync('lib', { recursive: true, force: true })\"",
-        "build": "tsc",
+        "build": "tsc -p tsconfig.build.json",
         "test": "jest --runInBand",
         "lint": "eslint src/**/*.ts"
     },

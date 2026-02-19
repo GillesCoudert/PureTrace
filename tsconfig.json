@@ -3,11 +3,11 @@
 
     "compilerOptions": {
         "declaration": true,
-        "rootDir": "src",
         "outDir": "./lib",
         "removeComments": true,
         "esModuleInterop": true,
         "isolatedModules": true
     },
-    "include": ["src"]
+    "include": ["src/**/*", "tests/**/*"],
+    "exclude": ["node_modules", "lib"]
 }

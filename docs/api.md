@@ -294,6 +294,91 @@ Preferred way to create Failures when using native error types.
 
 ---
 
+## Zod integration helpers
+
+PureTrace integrates with [Zod](https://zod.dev/) v4 to convert validation results into the Result pattern.
+
+---
+
+### pureZodParse
+
+Parses data with a Zod schema and returns a Result.
+
+```ts
+pureZodParse<T extends z.ZodObject<any>>(
+  data: unknown,
+  contract: T,
+): Result<z.infer<T>>
+```
+
+**Behavior:**
+
+- On **success**: returns `Success<T>` with validated data
+- On **failure**: returns `Failure` with structured errors
+
+**Error handling:**
+
+- **Generic Zod errors** (type mismatch, missing fields, etc.) are aggregated into a single error with code `zodParseFailed` and type `processError`. The error data contains:
+  - `count`: number of issues
+  - `zodError`: stack trace for debugging
+
+- **Custom errors** (from `.refine()` or `.superRefine()`) preserve their `message` as the error `code` and `params` as the error `data`
+
+**Example:**
+
+```ts
+import { pureZodParse } from '@gilles-coudert/pure-trace';
+import z from 'zod';
+
+const schema = z.object({
+    username: z.string().min(3),
+    age: z.number().refine((val) => val >= 18, {
+        message: 'USER_TOO_YOUNG',
+        params: { minAge: 18 },
+    }),
+});
+
+const result = pureZodParse({ username: 'ab', age: 15 }, schema);
+
+if (result.isFailure()) {
+    const errors = result.getErrors();
+    // errors[0]: { code: 'USER_TOO_YOUNG', type: 'processError', data: { minAge: 18 } }
+    // errors[1]: { code: 'zodParseFailed', type: 'processError', data: { count: '1', zodError: '...' } }
+}
+```
+
+---
+
+### convertZodParseResultToPureResult
+
+Advanced helper for converting a Zod `SafeParseResult` into a PureTrace `Result`.
+
+```ts
+convertZodParseResultToPureResult<TOutput>(
+  result: z.ZodSafeParseResult<TOutput>,
+): Result<TOutput>
+```
+
+**Use case:** When you need to process Zod results manually before converting them.
+
+**Example:**
+
+```ts
+import { convertZodParseResultToPureResult } from '@gilles-coudert/pure-trace';
+import z from 'zod';
+
+const schema = z.object({ name: z.string() });
+const zodResult = schema.safeParse({ name: 'Alice' });
+
+const result = convertZodParseResultToPureResult(zodResult);
+
+if (result.isSuccess()) {
+    console.log(result.value); // { name: 'Alice' }
+}
+```
+
+---
+
 ## Design notes
 
 - No exceptions in business logic
