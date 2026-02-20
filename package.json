@@ -1,6 +1,6 @@
 {
     "name": "@gilles-coudert/pure-trace",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "description": "A TypeScript library providing standardized, localizable, and traceable error handling by design, with observability built-in.",
     "private": false,
     "publishConfig": {
