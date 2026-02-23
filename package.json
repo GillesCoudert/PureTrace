@@ -40,7 +40,7 @@
         "@types/node": "^25.3.0",
         "@typescript-eslint/eslint-plugin": "^8.56.0",
         "@typescript-eslint/parser": "^8.56.0",
-        "eslint": "^10.0.0",
+        "eslint": "^10.0.1",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-prettier": "^5.5.5",
         "globals": "^17.3.0",
@@ -51,7 +51,7 @@
         "ts-jest": "^29.4.6",
         "typescript": "^5.9.3",
         "typescript-eslint": "^8.56.0",
-        "zod": "^4.3.6"
+        "zod": "^4"
     },
     "peerDependencies": {
         "zod": "^4.0.0"

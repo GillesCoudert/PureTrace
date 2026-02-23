@@ -1,7 +1,6 @@
 # Examples
 
-This document presents common PureTrace usage patterns.
-Examples focus on composition, trace propagation, and error semantics.
+This document presents common PureTrace usage patterns, focusing on composition, trace propagation, and error semantics. Each example illustrates a best practice described in [best_practices.md](best_practices.md).
 
 ---
 
@@ -35,21 +34,12 @@ const maxLength =
                   actual: value.length,
               });
 
-function composeValidations<T>(
-    ...rules: ValidationRule<T>[]
-): ValidationRule<T> {
-    return (value) =>
-        rules.reduce(
-            (result, rule) => result.chainSuccess(rule),
-            new Success(value) as Result<T>,
-        );
-}
-
-const validateUsername = composeValidations(
-    notEmpty,
-    minLength(3),
-    maxLength(20),
-);
+const validateUsername = (value: string) =>
+    GetResult.fromResultArray([
+        notEmpty(value),
+        minLength(3)(value),
+        maxLength(20)(value),
+    ]);
 ```
 
 ---
@@ -302,7 +292,7 @@ function checkEmailDomain(email: string): Result<string> {
 
     return allowedDomains.includes(domain)
         ? new Success(email)
-        : generateFailure('processError', 'INVALID_EMAIL_DOMAIN', {
+        : generateFailure('processError', 'invalidEmailDomain', {
               email,
               domain,
               allowedDomains,
@@ -311,7 +301,7 @@ function checkEmailDomain(email: string): Result<string> {
 
 function checkRolePermission(role: string): Result<string> {
     return role === 'guest'
-        ? generateFailure('processError', 'GUEST_REGISTRATION_DISABLED', {
+        ? generateFailure('processError', 'guestRegistrationDisabled', {
               role,
           })
         : new Success(role);
@@ -360,7 +350,7 @@ function handleApiRequest(
             const apiErrors = errors.map((err) =>
                 generateError({
                     type: 'processError',
-                    code: 'INVALID_REQUEST',
+                    code: 'invalidRequest',
                     data: {
                         originalCode: err.code,
                         originalData: err.data,
@@ -386,7 +376,7 @@ const result = handleApiRequest({ action: 'invalid', payload: {} });
 
 if (result.isFailure()) {
     const errors = result.getErrors();
-    // All errors have code 'INVALID_REQUEST' with original error details in data
+    // All errors have code 'invalidRequest' with original error details in data
 }
 ```
 

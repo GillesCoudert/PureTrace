@@ -1,9 +1,19 @@
 # API Reference
 
-This document describes the public API of PureTrace.  
+This document describes the public API of PureTrace.
 It focuses on types, responsibilities, and composition rules.
 
----
+## Table of Contents
+
+- [Result<S>](#results)
+- [Success<S>](#successs)
+- [Failure](#failure)
+- [ResultAsync<S>](#resultasyncs)
+- [GetResult](#getresult)
+- [Message](#message)
+- [Native message helpers](#native-message-helpers)
+- [Native message kinds](#native-message-kinds)
+- [Zod integration helpers](#zod-integration-helpers)
 
 ## Result<S>
 
@@ -18,8 +28,6 @@ A Result:
 - is explicit (success or failure)
 - propagates traces automatically
 - accumulates traces through transformations
-
----
 
 ### Introspection
 
@@ -40,8 +48,6 @@ getErrors(): Message[] // Failure only
 
 Returns messages with `kind: 'error'`.
 
----
-
 ### Transformations
 
 ```ts
@@ -58,8 +64,6 @@ mapBoth<S2>(
   onFailure: (errors: Message[]) => Failure,
 ): Result<S2>
 ```
-
----
 
 ### Chaining
 
@@ -82,15 +86,11 @@ chainBoth<S2, S3>(
 chain<S2>(fn: (result: Result<S>) => Result<S2>): Result<S2>
 ```
 
----
-
 ### Side effects
 
 ```ts
 tap(fn: (result: Result<S>) => void): Result<S>
 ```
-
----
 
 ### Trace management
 
@@ -101,8 +101,6 @@ addTraces(...traces: Message[]): this
 ```ts
 addErrors(...errors: Message[]): this // Failure only
 ```
-
----
 
 ## Success<S>
 
@@ -119,8 +117,6 @@ new Success(value: S)
 new Success(value: S, initialTrace: Message)
 ```
 
----
-
 ## Failure
 
 ```ts
@@ -133,8 +129,6 @@ Constructors:
 new Failure(...errors: Message[])
 ```
 
----
-
 ## ResultAsync<S>
 
 Asynchronous counterpart of Result.
@@ -142,8 +136,6 @@ Asynchronous counterpart of Result.
 ```ts
 class ResultAsync<S>
 ```
-
----
 
 ### Creation
 
@@ -154,19 +146,13 @@ ResultAsync.fromPromise<S>(
 ): ResultAsync<S>
 ```
 
----
-
 ### Composition
 
 All Result methods are available (`mapSuccess`, `chainSuccess`, `tap`, etc.).
 
----
-
 ## GetResult
 
 Utilities for integrating unsafe or external code.
-
----
 
 ### fromThrowable
 
@@ -177,8 +163,6 @@ GetResult.fromThrowable<X>(
 ): Result<X>
 ```
 
----
-
 ### fromResultArray
 
 ```ts
@@ -188,8 +172,6 @@ GetResult.fromResultArray<X>(
 ): Result<X[]>
 ```
 
----
-
 ### fromResultArrayAsSuccess
 
 ```ts
@@ -197,8 +179,6 @@ GetResult.fromResultArrayAsSuccess<X>(
   results: Result<X>[],
 ): Success<X[]>
 ```
-
----
 
 ## Message
 
@@ -213,13 +193,9 @@ type Message = {
 };
 ```
 
----
-
 ## Native message helpers
 
 The following helpers are **recommended** when using PureTrace native message types.
-
----
 
 ### generateMessage
 
@@ -235,8 +211,6 @@ generateMessage<K, T>(options: {
   localizedMessage?: string;
 }): Message
 ```
-
----
 
 ### generateError
 
@@ -254,8 +228,6 @@ generateError<T>(options: {
 
 Intended for advanced use cases where errors are assembled manually.
 
----
-
 ### generateFailure
 
 Creates a Failure containing a native error Message.
@@ -271,8 +243,6 @@ generateFailure<T>(
 ```
 
 Preferred way to create Failures when using native error types.
-
----
 
 ## Native message kinds
 
@@ -292,13 +262,9 @@ Preferred way to create Failures when using native error types.
 - `start`
 - `stop`
 
----
-
 ## Zod integration helpers
 
 PureTrace integrates with [Zod](https://zod.dev/) v4 to convert validation results into the Result pattern.
-
----
 
 ### pureZodParse
 
@@ -319,8 +285,8 @@ pureZodParse<T extends z.ZodObject<any>>(
 **Error handling:**
 
 - **Generic Zod errors** (type mismatch, missing fields, etc.) are aggregated into a single error with code `zodParseFailed` and type `processError`. The error data contains:
-  - `count`: number of issues
-  - `zodError`: stack trace for debugging
+    - `count`: number of issues
+    - `zodError`: stack trace for debugging
 
 - **Custom errors** (from `.refine()` or `.superRefine()`) preserve their `message` as the error `code` and `params` as the error `data`
 
@@ -346,8 +312,6 @@ if (result.isFailure()) {
     // errors[1]: { code: 'zodParseFailed', type: 'processError', data: { count: '1', zodError: '...' } }
 }
 ```
-
----
 
 ### convertZodParseResultToPureResult
 
@@ -376,8 +340,6 @@ if (result.isSuccess()) {
     console.log(result.value); // { name: 'Alice' }
 }
 ```
-
----
 
 ## Design notes
 
