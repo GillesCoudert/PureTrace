@@ -1,11 +1,12 @@
 import z from 'zod';
 import {
-    Error,
+    PureError,
     generateError,
-    Message,
+    PureMessage,
     messageSchema,
     NativeErrorData,
     NativeErrorType,
+    LocalizedMessage,
 } from './pure_message';
 
 /**
@@ -17,9 +18,9 @@ export type Result<S> = Success<S> | Failure;
 abstract class PureResult<S> {
     /**
      * Constructs a new PureResult instance.
-     * @param trace - An optional trace message to associate with the result.
+     * @param trace - An optional PureMessage to associate with the result.
      */
-    constructor(trace?: Message) {
+    constructor(trace?: PureMessage) {
         if (trace) {
             this.addTraces(trace);
         }
@@ -29,13 +30,13 @@ abstract class PureResult<S> {
     //#region                            TRACE MANAGEMENT                          #
     //#────────────────────────────────────────────────────────────────────────────#
 
-    private readonly traces: Message[] = [];
+    private readonly traces: PureMessage[] = [];
 
     /**
      * Retrieves the trace messages associated with this result.
      * @returns A copy of the trace messages.
      */
-    public getTraces(): Message[] {
+    public getTraces(): PureMessage[] {
         return structuredClone(this.traces);
     }
 
@@ -44,7 +45,7 @@ abstract class PureResult<S> {
      * @param traces - The trace messages to add.
      * @returns The current instance for chaining.
      */
-    public addTraces(...traces: Message[]): this {
+    public addTraces(...traces: PureMessage[]): this {
         for (let trace of traces) {
             const zodParseResult = messageSchema.safeParse(trace);
             if (!zodParseResult.success) {
@@ -52,7 +53,7 @@ abstract class PureResult<S> {
                     type: 'pureTraceInternalError',
                     code: 'invalidTraceMessage',
                     data: {
-                        message: trace,
+                        pureMessage: trace,
                         zodError: z.treeifyError(zodParseResult.error),
                     },
                 });
@@ -86,6 +87,35 @@ abstract class PureResult<S> {
 
     //#endregion ───── INTROSPECTION ─────
 
+    //#region    ───── TAP (SIDE-EFFECTS) ─────
+
+    /**
+     * Calls the provided function if the result is a success.
+     * @param onSuccess - Function to call with the success instance.
+     * @returns The current Result instance.
+     */
+    abstract tapSuccess(onSuccess: (success: Success<S>) => void): Result<S>;
+
+    /**
+     * Calls the provided function if the result is a failure.
+     * @param onFailure - Function to call with the failure instance.
+     * @returns The current Result instance.
+     */
+    abstract tapFailure(onFailure: (failure: Failure) => void): Result<S>;
+
+    /**
+     * Calls the appropriate function depending on success or failure.
+     * @param onSuccess - Function to call with the success instance.
+     * @param onFailure - Function to call with the failure instance.
+     * @returns The current Result instance.
+     */
+    abstract tapBoth(
+        onSuccess: (success: Success<S>) => void,
+        onFailure: (failure: Failure) => void,
+    ): Result<S>;
+
+    //#endregion ───── TAP (SIDE-EFFECTS) ─────
+
     //#region    ───── FUNCTORS ─────
 
     /**
@@ -100,7 +130,7 @@ abstract class PureResult<S> {
      * @param f - The function to apply to the failure messages.
      * @returns A new Result with the mapped failure messages.
      */
-    abstract mapFailure(f: (errors: Message[]) => Failure): Result<S>;
+    abstract mapFailure(f: (errors: PureMessage[]) => Failure): Result<S>;
 
     /**
      * Maps both success and failure values using the provided functions.
@@ -110,7 +140,7 @@ abstract class PureResult<S> {
      */
     abstract mapBoth<S2>(
         onSuccess: (value: S) => Success<S2>,
-        onFailure: (errors: Message[]) => Failure,
+        onFailure: (errors: PureMessage[]) => Failure,
     ): Result<S2>;
 
     //#endregion ───── FUNCTORS ─────
@@ -130,7 +160,7 @@ abstract class PureResult<S> {
      * @returns A new Result with the chained failure messages.
      */
     abstract chainFailure<S2>(
-        f: (errors: Message[]) => Result<S2>,
+        f: (errors: PureMessage[]) => Result<S2>,
     ): Result<S | S2>;
 
     /**
@@ -141,7 +171,7 @@ abstract class PureResult<S> {
      */
     abstract chainBoth<S2, S3>(
         onSuccess: (value: S) => Result<S2>,
-        onFailure: (errors: Message[]) => Result<S3>,
+        onFailure: (errors: PureMessage[]) => Result<S3>,
     ): Result<S2 | S3>;
 
     /**
@@ -191,7 +221,7 @@ export class Success<S> extends PureResult<S> {
      */
     constructor(
         public readonly value: S,
-        trace?: Message,
+        trace?: PureMessage,
     ) {
         super(trace);
     }
@@ -218,6 +248,45 @@ export class Success<S> extends PureResult<S> {
 
     //#endregion ───── INTROSPECTION ─────
 
+    //#region    ───── TAP (SIDE-EFFECTS) ─────
+
+    /**
+     * Calls the provided function with the success instance.
+     * @param onSuccess Function to call with the success instance.
+     * @returns The current Result instance.
+     */
+    public tapSuccess(onSuccess: (success: Success<S>) => void): Result<S> {
+        onSuccess(this);
+        return this;
+    }
+
+    /**
+     * Does nothing for Success.
+     * @param onFailure Ignored function.
+     * @returns The current Result instance.
+     */
+    public tapFailure(onFailure: (failure: Failure) => void): Result<S> {
+        void onFailure;
+        return this;
+    }
+
+    /**
+     * Calls onSuccess with the success instance, ignores onFailure.
+     * @param onSuccess Function to call with the success instance.
+     * @param onFailure Ignored function.
+     * @returns The current Result instance.
+     */
+    public tapBoth(
+        onSuccess: (success: Success<S>) => void,
+        onFailure: (failure: Failure) => void,
+    ): Result<S> {
+        onSuccess(this);
+        void onFailure;
+        return this;
+    }
+
+    //#endregion ───── TAP (SIDE-EFFECTS) ─────
+
     //#region    ───── FUNCTORS ─────
 
     /**
@@ -234,7 +303,7 @@ export class Success<S> extends PureResult<S> {
      * @param _ Ignored function.
      * @returns This instance.
      */
-    public mapFailure(_: (errors: Message[]) => Failure): Result<S> {
+    public mapFailure(_: (errors: PureMessage[]) => Failure): Result<S> {
         return this;
     }
 
@@ -246,7 +315,7 @@ export class Success<S> extends PureResult<S> {
      */
     public mapBoth<S2>(
         onSuccess: (value: S) => Success<S2>,
-        _: (errors: Message[]) => Failure,
+        _: (errors: PureMessage[]) => Failure,
     ): Result<S2> {
         return this.mapSuccess(onSuccess);
     }
@@ -265,7 +334,7 @@ export class Success<S> extends PureResult<S> {
      * @returns This instance.
      */
     public chainFailure<S2>(
-        _: (errors: Message[]) => Result<S2>,
+        _: (errors: PureMessage[]) => Result<S2>,
     ): Result<S | S2> {
         return this;
     }
@@ -278,7 +347,7 @@ export class Success<S> extends PureResult<S> {
      */
     public chainBoth<S2, S3>(
         onSuccess: (value: S) => Result<S2>,
-        _: (errors: Message[]) => Result<S3>,
+        _: (errors: PureMessage[]) => Result<S3>,
     ): Result<S2 | S3> {
         return this.chainSuccess(onSuccess);
     }
@@ -303,12 +372,12 @@ export class Success<S> extends PureResult<S> {
  * Represents a failed result.
  */
 export class Failure extends PureResult<never> {
-    private readonly errors: Error[] = [];
+    private readonly errors: PureError[] = [];
     /**
      * Creates a new Failure instance.
      * @param errors One or more errors associated with the failure.
      */
-    constructor(...errors: Error[]) {
+    constructor(...errors: PureError[]) {
         super();
         this.addErrors(errors);
     }
@@ -317,7 +386,7 @@ export class Failure extends PureResult<never> {
     //#region                            ERROR MANAGEMENT                          #
     //#────────────────────────────────────────────────────────────────────────────#
 
-    public getErrors(): Error[] {
+    public getErrors(): PureError[] {
         return structuredClone(this.errors);
     }
 
@@ -326,7 +395,7 @@ export class Failure extends PureResult<never> {
      * @param errors The errors to add.
      * @returns The current instance for chaining.
      */
-    public addErrors(errors: Error[]): this {
+    public addErrors(errors: PureError[]): this {
         for (let error of errors) {
             const zodParseResult = messageSchema.safeParse(error);
             if (!zodParseResult.success) {
@@ -334,7 +403,7 @@ export class Failure extends PureResult<never> {
                     type: 'pureTraceInternalError',
                     code: 'invalidError',
                     data: {
-                        message: error,
+                        pureMessage: error,
                         zodError: z.treeifyError(zodParseResult.error),
                     },
                 });
@@ -364,19 +433,60 @@ export class Failure extends PureResult<never> {
 
     //#endregion ───── INTROSPECTION ─────
 
+    //#region    ───── TAP (SIDE-EFFECTS) ─────
+
+    /**
+     * Does nothing for Failure.
+     * @param onSuccess Ignored function.
+     * @returns The current Result instance.
+     */
+    public tapSuccess(
+        onSuccess: (success: Success<never>) => void,
+    ): Result<never> {
+        void onSuccess;
+        return this;
+    }
+
+    /**
+     * Calls the provided function with the failure instance.
+     * @param onFailure Function to call with the failure instance.
+     * @returns The current Result instance.
+     */
+    public tapFailure(onFailure: (failure: Failure) => void): Result<never> {
+        onFailure(this);
+        return this;
+    }
+
+    /**
+     * Calls onFailure with the failure instance, ignores onSuccess.
+     * @param onSuccess Ignored function.
+     * @param onFailure Function to call with the failure instance.
+     * @returns The current Result instance.
+     */
+    public tapBoth(
+        onSuccess: (success: Success<never>) => void,
+        onFailure: (failure: Failure) => void,
+    ): Result<never> {
+        void onSuccess;
+        onFailure(this);
+        return this;
+    }
+
+    //#endregion ───── TAP (SIDE-EFFECTS) ─────
+
     //#region    ───── FUNCTORS ─────
 
     public mapSuccess<S2>(_: (value: never) => Success<S2>): Result<S2> {
         return this;
     }
 
-    public mapFailure(f: (errors: Message[]) => Failure): Result<never> {
+    public mapFailure(f: (errors: PureMessage[]) => Failure): Result<never> {
         return f(this.getErrors()).addTraces(...this.getTraces());
     }
 
     public mapBoth<S2>(
         _: (value: never) => Success<S2>,
-        onFailure: (errors: Message[]) => Failure,
+        onFailure: (errors: PureMessage[]) => Failure,
     ): Result<S2> {
         return this.mapFailure(onFailure);
     }
@@ -389,13 +499,15 @@ export class Failure extends PureResult<never> {
         return this;
     }
 
-    public chainFailure<S2>(f: (errors: Message[]) => Result<S2>): Result<S2> {
+    public chainFailure<S2>(
+        f: (errors: PureMessage[]) => Result<S2>,
+    ): Result<S2> {
         return f(this.getErrors()).addTraces(...this.getTraces());
     }
 
     public chainBoth<S2, S3>(
         _: (value: never) => Result<S2>,
-        onFailure: (errors: Message[]) => Result<S3>,
+        onFailure: (errors: PureMessage[]) => Result<S3>,
     ): Result<S2 | S3> {
         return this.chainFailure(onFailure);
     }
@@ -415,13 +527,13 @@ export class Failure extends PureResult<never> {
 }
 
 /**
- * Generates a Failure from error details.
- * @template T The type of the error.
- * @param type The error type.
- * @param code The error code.
- * @param data The error data.
+ * Generates a Failure from PureError details.
+ * @template T The type of the PureError.
+ * @param type The PureError type.
+ * @param code The PureError code.
+ * @param data The PureError data.
  * @param issuer Optional issuer.
- * @param localizedMessage Optional localized message.
+ * @param localizedMessage Optional localized message object with locale and message.
  * @returns A Failure instance.
  */
 export function generateFailure<T extends NativeErrorType>(parameters: {
@@ -429,7 +541,7 @@ export function generateFailure<T extends NativeErrorType>(parameters: {
     code: string;
     data?: NativeErrorData<T>;
     issuer?: string;
-    localizedMessage?: string;
+    localizedMessage?: LocalizedMessage;
 }): Failure {
     return new Failure(generateError(parameters));
 }
@@ -466,7 +578,7 @@ export class GetResult {
         firstFailureOnly: boolean = true,
     ): Result<X[]> {
         const successes: X[] = [];
-        const traces: Message[] = [];
+        const traces: PureMessage[] = [];
         let failure: Failure | undefined = undefined;
         for (const result of results) {
             //>
@@ -515,7 +627,7 @@ export class GetResult {
         results: Result<X>[],
     ): Success<X[]> {
         const successes: X[] = [];
-        const traces: Message[] = [];
+        const traces: PureMessage[] = [];
         for (const result of results) {
             //>
             //> > fr: Préservation des traces

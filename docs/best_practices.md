@@ -18,6 +18,27 @@ Best Practices
 
 ---
 
+## Result introspection
+
+- **Minimize usage of `isSuccess` and `isFailure`**: These methods break the functional chain and should be used sparingly.
+- Prefer functional combinators (`mapSuccess`, `mapFailure`, `chainSuccess`, `tapBoth`, etc.) over explicit branching with `isSuccess`/`isFailure`.
+- Using `isSuccess`/`isFailure` prevents proper trace propagation and makes code harder to compose.
+- Only use these methods at application boundaries (controllers, main entry points) where you need to explicitly branch on the result type.
+- **Anti-pattern**: `if (result.isSuccess()) { ... } else { ... }` in business logic.
+- **Good pattern**: `result.mapSuccess(...).mapFailure(...)` or `result.chainSuccess(...).chainFailure(...)`.
+
+---
+
+## Side effects (tap methods)
+
+- **Always use `tapBoth` when you need to handle both success and failure cases**: Do not chain `tapSuccess` and `tapFailure` separately.
+- **Why:** While chaining `tapSuccess().tapFailure()` works with `map*` methods, it fails with `chain*` methods that can change the Result type.
+- Use `tapSuccess` or `tapFailure` alone only when you explicitly want to handle a single case.
+- **Anti-pattern**: `result.tapSuccess(...).tapFailure(...).chainSuccess(...)`
+- **Good pattern**: `result.tapBoth(..., ...).chainSuccess(...)`
+
+---
+
 ## Tracing & observability
 
 - Add business or technical traces with `addTraces` or `tap` for observability.

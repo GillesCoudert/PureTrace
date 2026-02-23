@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/only-throw-error */
-import { Message } from './pure_message';
+import { PureMessage } from './pure_message';
 import { Success, Failure, generateFailure, Result } from './pure_result';
 
 export type ResultAsyncValue<S> = PromiseLike<Success<S>>;
@@ -71,22 +71,28 @@ const resultAsyncHelpers: ResultAsyncHelpers = {
 export interface ResultAsync<S> extends PromiseLike<Result<S>> {
     resolve(): Promise<Result<S>>;
     tap(f: (result: Result<S>) => void): ResultAsync<S>;
+    tapSuccess(onSuccess: (success: Success<S>) => void): ResultAsync<S>;
+    tapFailure(onFailure: (failure: Failure) => void): ResultAsync<S>;
+    tapBoth(
+        onSuccess: (success: Success<S>) => void,
+        onFailure: (failure: Failure) => void,
+    ): ResultAsync<S>;
     mapSuccess<S2>(onSuccess: (value: S) => Success<S2>): ResultAsync<S2>;
-    mapFailure(onFailure: (errors: Message[]) => Failure): ResultAsync<S>;
+    mapFailure(onFailure: (errors: PureMessage[]) => Failure): ResultAsync<S>;
     mapBoth<S2>(
         onSuccess: (value: S) => Success<S2>,
-        onFailure: (errors: Message[]) => Failure,
+        onFailure: (errors: PureMessage[]) => Failure,
     ): ResultAsync<S2>;
     chain<S2>(next: (result: Result<S>) => ResultAsync<S2>): ResultAsync<S2>;
     chainSuccess<S2>(
         onSuccess: (value: S) => PromiseLike<Result<S2>>,
     ): ResultAsync<S2>;
     chainFailure<S2>(
-        onFailure: (errors: Message[]) => PromiseLike<Result<S2>>,
+        onFailure: (errors: PureMessage[]) => PromiseLike<Result<S2>>,
     ): ResultAsync<S | S2>;
     chainBoth<S2, S3>(
         onSuccess: (value: S) => PromiseLike<Result<S3>>,
-        onFailure: (errors: Message[]) => PromiseLike<Result<S2>>,
+        onFailure: (errors: PureMessage[]) => PromiseLike<Result<S2>>,
     ): ResultAsync<S2 | S3>;
 }
 
@@ -118,6 +124,27 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
         );
     }
 
+    tapSuccess(onSuccess: (success: Success<S>) => void): ResultAsync<S> {
+        return ResultAsync(async ({ liftResult }) =>
+            liftResult((await this.resolve()).tapSuccess(onSuccess)),
+        );
+    }
+
+    tapFailure(onFailure: (failure: Failure) => void): ResultAsync<S> {
+        return ResultAsync(async ({ liftResult }) =>
+            liftResult((await this.resolve()).tapFailure(onFailure)),
+        );
+    }
+
+    tapBoth(
+        onSuccess: (success: Success<S>) => void,
+        onFailure: (failure: Failure) => void,
+    ): ResultAsync<S> {
+        return ResultAsync(async ({ liftResult }) =>
+            liftResult((await this.resolve()).tapBoth(onSuccess, onFailure)),
+        );
+    }
+
     mapSuccess<S2>(onSuccess: (value: S) => Success<S2>): ResultAsync<S2> {
         return ResultAsync(async (helpers) => {
             const result = await this.resolve();
@@ -125,7 +152,7 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
         });
     }
 
-    mapFailure(onFailure: (errors: Message[]) => Failure): ResultAsync<S> {
+    mapFailure(onFailure: (errors: PureMessage[]) => Failure): ResultAsync<S> {
         return ResultAsync(async (helpers) => {
             const result = await this.resolve();
             if (result.isFailure()) {
@@ -137,7 +164,7 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
 
     mapBoth<S2>(
         onSuccess: (value: S) => Success<S2>,
-        onFailure: (errors: Message[]) => Failure,
+        onFailure: (errors: PureMessage[]) => Failure,
     ): ResultAsync<S2> {
         return ResultAsync(async (helpers) => {
             const result = await this.resolve();
@@ -167,7 +194,7 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
     }
 
     chainFailure<S2>(
-        next: (errors: Message[]) => PromiseLike<Result<S2>>,
+        next: (errors: PureMessage[]) => PromiseLike<Result<S2>>,
     ): ResultAsync<S | S2> {
         return ResultAsync(async (helpers) => {
             const result = await this.resolve();
@@ -182,7 +209,7 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
 
     chainBoth<S2, S3>(
         nextSuccess: (value: S) => PromiseLike<Result<S3>>,
-        nextFailure: (errors: Message[]) => PromiseLike<Result<S2>>,
+        nextFailure: (errors: PureMessage[]) => PromiseLike<Result<S2>>,
     ): ResultAsync<S2 | S3> {
         return ResultAsync(async (helpers) => {
             const result = await this.resolve();

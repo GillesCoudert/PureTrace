@@ -5,17 +5,17 @@ It focuses on types, responsibilities, and composition rules.
 
 ## Table of Contents
 
-- [Result<S>](#results)
-- [Success<S>](#successs)
+- [Result&lt;S&gt;](#results)
+- [Success&lt;S&gt;](#successs)
 - [Failure](#failure)
-- [ResultAsync<S>](#resultasyncs)
+- [ResultAsync&lt;S&gt;](#resultasyncs)
 - [GetResult](#getresult)
-- [Message](#message)
-- [Native message helpers](#native-message-helpers)
-- [Native message kinds](#native-message-kinds)
+- [PureMessage](#puremessage)
+- [Native pure message helpers](#native-pure-message-helpers)
+- [Native pure message kinds](#native-pure-message-kinds)
 - [Zod integration helpers](#zod-integration-helpers)
 
-## Result<S>
+## Result&lt;S&gt;
 
 Represents the outcome of an operation.
 
@@ -37,13 +37,13 @@ isFailure(): boolean
 ```
 
 ```ts
-getTraces(): Message[]
+getTraces(): PureMessage[]
 ```
 
 Returns all trace messages (errors included), in order.
 
 ```ts
-getErrors(): Message[] // Failure only
+getErrors(): PureError[] // Failure only
 ```
 
 Returns messages with `kind: 'error'`.
@@ -55,13 +55,13 @@ mapSuccess<S2>(fn: (value: S) => Success<S2>): Result<S2>
 ```
 
 ```ts
-mapFailure(fn: (errors: Message[]) => Failure): Result<S>
+mapFailure(fn: (errors: PureError[]) => Failure): Result<S>
 ```
 
 ```ts
 mapBoth<S2>(
   onSuccess: (value: S) => Success<S2>,
-  onFailure: (errors: Message[]) => Failure,
+  onFailure: (errors: PureError[]) => Failure,
 ): Result<S2>
 ```
 
@@ -72,7 +72,7 @@ chainSuccess<S2>(fn: (value: S) => Result<S2>): Result<S2>
 ```
 
 ```ts
-chainFailure<S2>(fn: (errors: Message[]) => Result<S2>): Result<S | S2>
+chainFailure<S2>(fn: (errors: PureError[]) => Result<S2>): Result<S | S2>
 ```
 
 ```ts
@@ -92,17 +92,40 @@ chain<S2>(fn: (result: Result<S>) => Result<S2>): Result<S2>
 tap(fn: (result: Result<S>) => void): Result<S>
 ```
 
+Executes a function with the result for side effects (logging, debugging, etc.) without transforming it.
+
+```ts
+tapSuccess(fn: (success: Success<S>) => void): Result<S>
+```
+
+Executes a function with the success instance only if the result is a success. No-op for failures.
+
+```ts
+tapFailure(fn: (failure: Failure) => void): Result<S>
+```
+
+Executes a function with the failure instance only if the result is a failure. No-op for successes.
+
+```ts
+tapBoth(
+  onSuccess: (success: Success<S>) => void,
+  onFailure: (failure: Failure) => void,
+): Result<S>
+```
+
+Executes the appropriate function depending on the result type without transforming it.
+
 ### Trace management
 
 ```ts
-addTraces(...traces: Message[]): this
+addTraces(...traces: PureMessage[]): this
 ```
 
 ```ts
-addErrors(...errors: Message[]): this // Failure only
+addErrors(...errors: PureError[]): this // Failure only
 ```
 
-## Success<S>
+## Success&lt;S&gt;
 
 ```ts
 class Success<S> {
@@ -114,7 +137,7 @@ Constructors:
 
 ```ts
 new Success(value: S)
-new Success(value: S, initialTrace: Message)
+new Success(value: S, initialTrace: PureMessage)
 ```
 
 ## Failure
@@ -126,10 +149,10 @@ class Failure
 Constructors:
 
 ```ts
-new Failure(...errors: Message[])
+new Failure(...errors: PureError[])
 ```
 
-## ResultAsync<S>
+## ResultAsync&lt;S&gt;
 
 Asynchronous counterpart of Result.
 
@@ -183,23 +206,35 @@ GetResult.fromResultArrayAsSuccess<X>(
 ## Message
 
 ```ts
-type Message = {
+type Locale = string; // BCP 47 format: 'fr', 'en-US', 'ja-JP', etc.
+// Pattern: /^[a-z]{2}(-[A-Z]{2})?$/
+
+type LocalizedMessage = {
+    locale?: Locale;
+    message: string;
+};
+
+type PureMessage = {
     kind: string;
     type: string;
     code: string;
     data?: unknown;
-    issuer?: string; // (optionnel) Qui a émis le message
-    localizedMessage?: string; // (optionnel) Message localisé pour l'utilisateur
+    issuer?: string;
+    localizedMessage?: LocalizedMessage;
 };
 ```
 
-## Native message helpers
+**Note:** Both `Locale` and `LocalizedMessage` are exported separately and can be used independently.
 
-The following helpers are **recommended** when using PureTrace native message types.
+````
+
+## Native pure message helpers
+
+The following helpers are **recommended** when using PureTrace native pure message types.
 
 ### generateMessage
 
-Creates a native non-error Message (trace, information, metric) with optional issuer and localizedMessage.
+Creates a native non-error PureMessage (trace, information, metric) with optional issuer and localizedMessage.
 
 ```ts
 generateMessage<K, T>(options: {
@@ -208,13 +243,13 @@ generateMessage<K, T>(options: {
   code: string;
   data?: NativeMessageData<K, T>;
   issuer?: string;
-  localizedMessage?: string;
-}): Message
-```
+  localizedMessage?: LocalizedMessage;
+}): PureMessage
+````
 
 ### generateError
 
-Creates a native error Message without wrapping it in a Failure, with optional issuer and localizedMessage.
+Creates a native PureError without wrapping it in a Failure, with optional issuer and localizedMessage.
 
 ```ts
 generateError<T>(options: {
@@ -222,15 +257,15 @@ generateError<T>(options: {
   code: string;
   data?: NativeErrorData<T>;
   issuer?: string;
-  localizedMessage?: string;
-}): Message
+  localizedMessage?: LocalizedMessage;
+}): PureError
 ```
 
 Intended for advanced use cases where errors are assembled manually.
 
 ### generateFailure
 
-Creates a Failure containing a native error Message.
+Creates a Failure containing a native PureError.
 
 ```ts
 generateFailure<T>(
@@ -238,15 +273,15 @@ generateFailure<T>(
   code: string,
   data?: NativeErrorData<T>,
   issuer?: string,
-  localizedMessage?: string,
+  localizedMessage?: LocalizedMessage,
 ): Failure
 ```
 
-Preferred way to create Failures when using native error types.
+Preferred way to create Failures when using native PureError types.
 
-## Native message kinds
+## Native pure message kinds
 
-### Errors (`kind: 'error'`)
+### PureErrors (`kind: 'error'`)
 
 - `processError`
 - `technicalIssue`
@@ -282,13 +317,11 @@ pureZodParse<T extends z.ZodObject<any>>(
 - On **success**: returns `Success<T>` with validated data
 - On **failure**: returns `Failure` with structured errors
 
-**Error handling:**
+**PureError handling:**
 
-- **Generic Zod errors** (type mismatch, missing fields, etc.) are aggregated into a single error with code `zodParseFailed` and type `processError`. The error data contains:
-    - `count`: number of issues
-    - `zodError`: stack trace for debugging
+-- **Generic Zod errors** (type mismatch, missing fields, etc.) are aggregated into a single PureError with code `zodParseFailed` and type `processError`. The error data contains: - `count`: number of issues - `zodError`: stack trace for debugging
 
-- **Custom errors** (from `.refine()` or `.superRefine()`) preserve their `message` as the error `code` and `params` as the error `data`
+-- **Custom errors** (from `.refine()` or `.superRefine()`) preserve their `message` as the PureError `code` and `params` as the PureError `data`
 
 **Example:**
 
@@ -299,7 +332,7 @@ import z from 'zod';
 const schema = z.object({
     username: z.string().min(3),
     age: z.number().refine((val) => val >= 18, {
-        message: 'USER_TOO_YOUNG',
+        message: 'userTooYoung',
         params: { minAge: 18 },
     }),
 });
@@ -308,14 +341,14 @@ const result = pureZodParse({ username: 'ab', age: 15 }, schema);
 
 if (result.isFailure()) {
     const errors = result.getErrors();
-    // errors[0]: { code: 'USER_TOO_YOUNG', type: 'processError', data: { minAge: 18 } }
-    // errors[1]: { code: 'zodParseFailed', type: 'processError', data: { count: '1', zodError: '...' } }
+    // errors[0]: { code: 'userTooYoung', type: 'processError', data: { minAge: 18 } } // PureError
+    // errors[1]: { code: 'zodParseFailed', type: 'processError', data: { count: '1', zodError: '...' } } // PureError
 }
 ```
 
 ### convertZodParseResultToPureResult
 
-Advanced helper for converting a Zod `SafeParseResult` into a PureTrace `Result`.
+Advanced helper for converting a Zod `SafeParseResult` into a PureTrace `Result` (with PureError).
 
 ```ts
 convertZodParseResultToPureResult<TOutput>(
@@ -334,10 +367,23 @@ import z from 'zod';
 const schema = z.object({ name: z.string() });
 const zodResult = schema.safeParse({ name: 'Alice' });
 
-const result = convertZodParseResultToPureResult(zodResult);
+const result = convertZodParseResultToPureResult(zodResult).tap((r) => {
+    if (r.isSuccess()) {
+        r.addTraces(
+            generateMessage({
+                kind: 'information',
+                type: 'information',
+                code: 'userValidated',
+                data: { name: r.value.name },
+            }),
+        );
+    }
+});
 
+// Access validated data and traces
 if (result.isSuccess()) {
-    console.log(result.value); // { name: 'Alice' }
+    const traces = result.getTraces();
+    // traces contain validation success information
 }
 ```
 
