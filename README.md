@@ -19,216 +19,52 @@ Use PureTrace if you want:
 
 PureTrace is designed for applications where errors are part of the domain, not just technical failures.
 
-## Installation
+## Quick Start
+
+### Installation
 
 ```bash
 npm install @gilles-coudert/pure-trace
 ```
 
-## Quick start
+### Minimal usage example
 
-```ts
-import { Result, Success, generateFailure } from '@gilles-coudert/pure-trace';
+```typescript
+import {
+    Success,
+    Failure,
+    generateFailure,
+    Result,
+} from '@gilles-coudert/pure-trace';
 
 function parseAge(input: string): Result<number> {
-    const age = Number.parseInt(input, 10);
-
-    if (Number.isNaN(age)) {
-        return generateFailure('processError', 'invalidAgeFormat', { input });
+    const age = Number(input);
+    if (Number.isNaN(age) || age < 0) {
+        return generateFailure({
+            type: 'processError',
+            code: 'invalidAge',
+            data: { input },
+        });
     }
-
-    if (age < 0 || age > 150) {
-        return generateFailure('processError', 'ageOutOfRange', { age });
-    }
-
     return new Success(age);
 }
 
-const result = parseAge('25');
+const result = parseAge('42');
 
 if (result.isSuccess()) {
-    console.log(result.value);
+    console.log('Age:', result.value); // Age: 42
 } else {
-    console.error(result.getErrors());
-    console.log(result.getTraces());
+    console.error('Error:', result.getErrors());
 }
 ```
 
-## Zod integration
+> This example demonstrates explicit error handling, typed outcomes, and traceability. See the [API documentation](docs/api.md) for advanced usage.
 
-PureTrace provides seamless integration with [Zod](https://zod.dev/) for data validation:
+## Advanced documentation
 
-```ts
-import { pureZodParse } from '@gilles-coudert/pure-trace';
-import z from 'zod';
-
-const userSchema = z.object({
-    name: z.string(),
-    age: z.number(),
-});
-
-const result = pureZodParse({ name: 'Alice', age: 25 }, userSchema);
-
-if (result.isSuccess()) {
-    console.log(result.value); // { name: 'Alice', age: 25 }
-} else {
-    console.error(result.getErrors()); // Structured error messages
-}
-```
-
-Custom validation errors are preserved:
-
-```ts
-const schema = z.object({
-    age: z.number().refine((val) => val >= 18, {
-        message: 'userTooYoung',
-        params: { minAge: 18 },
-    }),
-});
-
-const result = pureZodParse({ age: 15 }, schema);
-// Error code: 'userTooYoung', data: { minAge: 18 }
-```
-
-## Mental model
-
-- A **Result** is either `Success<S>` or `Failure`
-- A **Failure** contains **error message**
-- Both Success and Failure can accumulate **trace messages**
-- Errors are just messages with `kind: "error"`
-
-```ts
-type Result<S> = Success<S> | Failure;
-
-type Message = {
-    kind: 'error' | 'information' | 'metric' | string;
-    type: string;
-    code: string;
-    data?: unknown;
-    issuer?: string; // optional: who emitted the message
-    localizedMessage?: string; // optional: localized user message
-};
-```
-
-## Core API
-
-### Create results
-
-```ts
-const ok = new Success(42);
-
-const ko = generateFailure(
-    'processError',
-    'notFound',
-    { id: '123' },
-    'userService', // issuer (optional)
-    'Utilisateur non trouvé.', // localizedMessage (optional)
-);
-```
-
-### Compose (sync)
-
-```ts
-const result = parseAge('25')
-    .mapSuccess((age) => new Success(age * 12))
-    .chainSuccess((months) =>
-        months > 1800
-            ? generateFailure('processError', 'tooOld', { months })
-            : new Success(months),
-    );
-```
-
-### Side effects & traces
-
-```ts
-import { generateMessage } from '@gilles-coudert/pure-trace';
-
-const traced = parseAge('25').tap((r) => {
-    r.addTraces(
-        generateMessage(
-            'information',
-            'information',
-            'ageParsed',
-            { input: '25' },
-            'userService', // issuer (optional)
-            'Âge analysé avec succès.', // localizedMessage (optional)
-        ),
-    );
-});
-```
-
-### Enrich error messages
-
-You can add issuer to errors and traces:
-
-```ts
-import { generateError } from '@gilles-coudert/pure-trace';
-
-const error = generateError({
-    type: 'processError',
-    code: 'invalidAgeFormat',
-    data: { input: 'abc' },
-    issuer: 'userService', // optional
-});
-```
-
-### Async flows
-
-```ts
-import { ResultAsync } from '@gilles-coudert/pure-trace';
-
-const userResult = await ResultAsync.fromPromise(
-    () => fetch('/api/user'),
-    (error) => generateFailure('technicalIssue', 'networkError', { error }),
-).chainSuccess((res) =>
-    ResultAsync.fromPromise(
-        () => res.json(),
-        (error) =>
-            generateFailure('technicalIssue', 'jsonParseError', { error }),
-    ),
-);
-```
-
-## Localization-first errors
-
-Errors are designed for translation:
-
-- `code` is the translation key
-- `data` is the interpolation context
-
-```ts
-generateFailure('processError', 'userNotFound', { userId: '123' });
-
-// en: "User {userId} not found"
-// fr: "L'utilisateur {userId} n'a pas été trouvé"
-```
-
-Sometimes, translations have to be done at the source.
-In these cases, the localized message can be specified directly.
-
-```ts
-import { generateError } from '@gilles-coudert/pure-trace';
-
-const error = generateError({
-    type: 'processError',
-    code: 'invalidAgeFormat',
-    data: { input: 'abc' },
-    issuer: 'userService', // optional
-    localizedMessage: "L'âge indiqué est incorrect.",
-});
-```
-
-## What makes PureTrace different?
-
-- Traces propagate automatically with the Result
-- Errors are designed to be user-facing and localizable
-- Observability is built-in, not bolted on
-- No exceptions in business code
-
-## Documentation
-
-- **API reference** → `docs/api.md`
-- **Usage patterns & examples** → `docs/examples.md`
+- [API](docs/api.md)
+- [Best practices](docs/best_practices.md)
+- [Examples](docs/examples.md)
 
 ## Contributing
 
