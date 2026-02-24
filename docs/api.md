@@ -169,6 +169,35 @@ ResultAsync.fromPromise<S>(
 ): ResultAsync<S>
 ```
 
+```ts
+ResultAsync.fromResultPromise<S>(
+  promiseFn: () => Promise<Result<S>>,
+): ResultAsync<S>
+```
+
+### Lifting helpers
+
+```ts
+ResultAsync.liftResult<S>(result: Result<S>): ResultAsync<S>
+```
+
+Lifts a Result into a ResultAsync.
+
+**Important:** Do NOT use `liftResult(new Success(...))`, use `liftSuccess` instead.
+**Important:** Do NOT use `liftResult(generateFailure(...))`, use `liftFailure` instead.
+
+```ts
+ResultAsync.liftSuccess<S>(value: S): ResultAsync<S>
+```
+
+Lifts a value into a ResultAsync as a Success. Prefer this over `liftResult(new Success(...))`.
+
+```ts
+ResultAsync.liftFailure<T extends NativeErrorType>(parameters: PureErrorParameters<T>): ResultAsync<never>
+```
+
+Lifts a Failure into a ResultAsync from PureError parameters. Prefer this over `liftResult(generateFailure(...))`.
+
 ### Composition
 
 All Result methods are available (`mapSuccess`, `chainSuccess`, `tap`, etc.).

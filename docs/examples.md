@@ -12,16 +12,24 @@ type ValidationRule<T> = (value: T) => Result<T>;
 const notEmpty: ValidationRule<string> = (value) =>
     value.trim().length > 0
         ? new Success(value)
-        : generateFailure('processError', 'emptyString', { value });
+        : generateFailure({
+              type: 'processError',
+              code: 'emptyString',
+              data: { value },
+          });
 
 const minLength =
     (min: number): ValidationRule<string> =>
     (value) =>
         value.length >= min
             ? new Success(value)
-            : generateFailure('processError', 'stringTooShort', {
-                  min,
-                  actual: value.length,
+            : generateFailure({
+                  type: 'processError',
+                  code: 'stringTooShort',
+                  data: {
+                      min,
+                      actual: value.length,
+                  },
               });
 
 const maxLength =
@@ -29,9 +37,13 @@ const maxLength =
     (value) =>
         value.length <= max
             ? new Success(value)
-            : generateFailure('processError', 'stringTooLong', {
-                  max,
-                  actual: value.length,
+            : generateFailure({
+                  type: 'processError',
+                  code: 'stringTooLong',
+                  data: {
+                      max,
+                      actual: value.length,
+                  },
               });
 
 const validateUsername = (value: string) =>
@@ -49,11 +61,19 @@ const validateUsername = (value: string) =>
 ```ts
 function validateAge(age: number): Result<number> {
     if (age < 18) {
-        return generateFailure('processError', 'tooYoung', { age });
+        return generateFailure({
+            type: 'processError',
+            code: 'tooYoung',
+            data: { age },
+        });
     }
 
     if (age > 120) {
-        return generateFailure('processError', 'tooOld', { age });
+        return generateFailure({
+            type: 'processError',
+            code: 'tooOld',
+            data: { age },
+        });
     }
 
     return new Success(age);
@@ -88,15 +108,23 @@ const result = processUser(data).mapFailure((errors) => {
 const result = await ResultAsync.fromPromise(
     () => fetchUser(id),
     (error) =>
-        generateFailure('technicalIssue', 'userFetchFailed', { id, error }),
+        generateFailure({
+            type: 'technicalIssue',
+            code: 'userFetchFailed',
+            data: { id, error },
+        }),
 )
     .chainSuccess((user) =>
         ResultAsync.fromPromise(
             () => fetchUserProfile(user.id),
             (error) =>
-                generateFailure('technicalIssue', 'profileFetchFailed', {
-                    userId: user.id,
-                    error,
+                generateFailure({
+                    type: 'technicalIssue',
+                    code: 'profileFetchFailed',
+                    data: {
+                        userId: user.id,
+                        error,
+                    },
                 }),
         ).mapSuccess((profile) => new Success({ ...user, profile })),
     )
@@ -104,9 +132,13 @@ const result = await ResultAsync.fromPromise(
         ResultAsync.fromPromise(
             () => fetchPermissions(user.id),
             (error) =>
-                generateFailure('technicalIssue', 'permissionsFetchFailed', {
-                    userId: user.id,
-                    error,
+                generateFailure({
+                    type: 'technicalIssue',
+                    code: 'permissionsFetchFailed',
+                    data: {
+                        userId: user.id,
+                        error,
+                    },
                 }),
         ).mapSuccess((permissions) => new Success({ ...user, permissions })),
     );
@@ -203,9 +235,13 @@ async function fetchWithRetry<T>(
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         const result = await ResultAsync.fromPromise(fn, (error) =>
-            generateFailure('technicalIssue', 'networkError', {
-                attempt,
-                error,
+            generateFailure({
+                type: 'technicalIssue',
+                code: 'networkError',
+                data: {
+                    attempt,
+                    error,
+                },
             }),
         );
 
@@ -244,9 +280,13 @@ async function fetchWithRetry<T>(
 const result = GetResult.fromThrowable(
     () => JSON.parse(payload),
     (error) =>
-        generateFailure('technicalIssue', 'jsonParseError', {
-            payload,
-            error,
+        generateFailure({
+            type: 'technicalIssue',
+            code: 'jsonParseError',
+            data: {
+                payload,
+                error,
+            },
         }),
 );
 ```
@@ -340,17 +380,25 @@ function checkEmailDomain(email: string): Result<string> {
 
     return allowedDomains.includes(domain)
         ? new Success(email)
-        : generateFailure('processError', 'invalidEmailDomain', {
-              email,
-              domain,
-              allowedDomains,
+        : generateFailure({
+              type: 'processError',
+              code: 'invalidEmailDomain',
+              data: {
+                  email,
+                  domain,
+                  allowedDomains,
+              },
           });
 }
 
 function checkRolePermission(role: string): Result<string> {
     return role === 'guest'
-        ? generateFailure('processError', 'guestRegistrationDisabled', {
-              role,
+        ? generateFailure({
+              type: 'processError',
+              code: 'guestRegistrationDisabled',
+              data: {
+                  role,
+              },
           })
         : new Success(role);
 }

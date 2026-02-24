@@ -4,9 +4,8 @@ import {
     generateError,
     PureMessage,
     messageSchema,
-    NativeErrorData,
     NativeErrorType,
-    LocalizedMessage,
+    PureErrorParameters,
 } from './pure_message';
 
 /**
@@ -529,20 +528,12 @@ export class Failure extends PureResult<never> {
 /**
  * Generates a Failure from PureError details.
  * @template T The type of the PureError.
- * @param type The PureError type.
- * @param code The PureError code.
- * @param data The PureError data.
- * @param issuer Optional issuer.
- * @param localizedMessage Optional localized message object with locale and message.
+ * @param parameters The PureError parameters.
  * @returns A Failure instance.
  */
-export function generateFailure<T extends NativeErrorType>(parameters: {
-    type: T;
-    code: string;
-    data?: NativeErrorData<T>;
-    issuer?: string;
-    localizedMessage?: LocalizedMessage;
-}): Failure {
+export function generateFailure<T extends NativeErrorType>(
+    parameters: PureErrorParameters<T>,
+): Failure {
     return new Failure(generateError(parameters));
 }
 
