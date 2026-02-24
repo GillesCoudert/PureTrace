@@ -34,6 +34,7 @@ import {
     Success,
     Failure,
     generateFailure,
+    generateMessage,
     Result,
 } from '@gilles-coudert/pure-trace';
 
@@ -49,12 +50,24 @@ function parseAge(input: string): Result<number> {
     return new Success(age);
 }
 
-const result = parseAge('42');
+const result = parseAge('42').tapSuccess((success) => {
+    success.addTraces(
+        generateMessage({
+            kind: 'information',
+            type: 'information',
+            code: 'ageValidated',
+            data: { age: success.value },
+        }),
+    );
+});
 
 if (result.isSuccess()) {
-    console.log('Age:', result.value); // Age: 42
+    const traces = result.getTraces();
+    // traces contain validation success information (PureMessage)
+    // result.value contains: 42
 } else {
-    console.error('Error:', result.getErrors());
+    const errors = result.getErrors();
+    // errors contain structured error information (PureError)
 }
 ```
 

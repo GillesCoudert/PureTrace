@@ -1,6 +1,6 @@
 import z from 'zod';
 import { Failure, Result, Success } from './pure_result';
-import { Error, generateError } from './pure_message';
+import { PureError, generateError } from './pure_message';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function pureZodParse<T extends z.ZodObject<any>>(
@@ -16,7 +16,7 @@ export function convertZodParseResultToPureResult<TOutput>(
     if (result.success) {
         return new Success(result.data);
     } else {
-        const errorMessages: Error[] = [];
+        const errorMessages: PureError[] = [];
         let zodGenericErrorCount = 0;
         //>
         //> > fr: Une erreur Zod est constituée de plusieurs erreurs.

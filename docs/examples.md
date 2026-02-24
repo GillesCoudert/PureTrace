@@ -144,6 +144,54 @@ const result = processOrder(order).tap((r) => {
 
 ---
 
+## Side effects without transformation
+
+Use `tapBoth` for side effects (logging, metrics, debugging) without breaking the functional chain:
+
+```ts
+const result = validateUser(userData)
+    .tapBoth(
+        (success) => {
+            console.log('User validated:', success.value);
+            metrics.increment('user.validation.success');
+        },
+        (failure) => {
+            console.error('Validation failed:', failure.getErrors());
+            metrics.increment('user.validation.failure');
+        },
+    )
+    .chainSuccess(saveUser);
+```
+
+**Important:** Do not chain `tapSuccess` and `tapFailure` separately. While it works with `map*`, it fails with `chain*` methods that can change the Result type. Always prefer `tapBoth`.
+
+Prefer `tap*` methods over `isSuccess`/`isFailure` branching to maintain trace propagation:
+
+```ts
+// ✅ Good: maintains functional chain
+const result = processPayment(amount)
+    .tapBoth(
+        (success) =>
+            logger.info('Payment processed', { amount, id: success.value.id }),
+        (failure) =>
+            logger.error('Payment failed', {
+                amount,
+                errors: failure.getErrors(),
+            }),
+    )
+    .chainSuccess(sendReceipt);
+
+// ❌ Anti-pattern: breaks chain and trace propagation
+const result = processPayment(amount);
+if (result.isSuccess()) {
+    logger.info('Payment processed');
+} else {
+    logger.error('Payment failed');
+}
+```
+
+---
+
 ## Retry with trace accumulation
 
 ```ts
@@ -253,7 +301,7 @@ function registerUser(
 ): Result<{ username: string; email: string; age: number }> {
     return pureZodParse(data, registrationSchema).mapFailure((errors) =>
         new Failure(...errors).addTraces(
-            generateMessage({
+            generatePureMessage({
                 kind: 'information',
                 type: 'warning',
                 code: 'registrationValidationFailed',
@@ -268,8 +316,8 @@ const result = registerUser({ username: 'ab', email: 'bad', age: 15 });
 
 if (result.isFailure()) {
     const errors = result.getErrors();
-    // Error codes include: 'userTooYoung', 'zodParseFailed'
-    // Generic validation errors are aggregated
+    // PureError codes include: 'userTooYoung', 'zodParseFailed'
+    // Generic validation errors are aggregated as PureError
 }
 ```
 
@@ -320,11 +368,24 @@ function validateRegistration(
 const result = validateRegistration({
     email: 'user@external.com',
     role: 'user',
+}).tap((r) => {
+    if (r.isFailure()) {
+        r.addTraces(
+            generatePureMessage({
+                kind: 'information',
+                type: 'warning',
+                code: 'registrationFailed',
+                data: { timestamp: Date.now() },
+            }),
+        );
+    }
 });
 
 if (result.isFailure()) {
     // Could fail at schema validation, domain check, or role check
-    console.log(result.getErrors());
+    const errors = result.getErrors();
+    const traces = result.getTraces();
+    // traces (PureMessage) include business context and error details
 }
 ```
 
@@ -355,14 +416,17 @@ function handleApiRequest(
                         originalCode: err.code,
                         originalData: err.data,
                     },
-                    localizedMessage: 'The request format is invalid.',
+                    localizedMessage: {
+                        locale: 'en-US',
+                        message: 'The request format is invalid.',
+                    },
                 }),
             );
             return new Failure(...apiErrors);
         })
         .mapSuccess((value) =>
             new Success(value).addTraces(
-                generateMessage({
+                generatePureMessage({
                     kind: 'metric',
                     type: 'start',
                     code: 'requestValidated',
@@ -376,7 +440,7 @@ const result = handleApiRequest({ action: 'invalid', payload: {} });
 
 if (result.isFailure()) {
     const errors = result.getErrors();
-    // All errors have code 'invalidRequest' with original error details in data
+    // All PureErrors have code 'invalidRequest' with original error details in data
 }
 ```
 
