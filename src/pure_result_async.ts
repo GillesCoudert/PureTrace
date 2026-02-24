@@ -1,29 +1,46 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/only-throw-error */
-import { PureMessage } from './pure_message';
+import {
+    PureMessage,
+    NativeErrorType,
+    PureErrorParameters,
+} from './pure_message';
 import { Success, Failure, generateFailure, Result } from './pure_result';
 
-export type ResultAsyncValue<S> = PromiseLike<Success<S>>;
+export type ResultAsyncValue<S> = PromiseLike<Result<S>>;
 
 export interface ResultAsyncHelpers {
     /**
      * Lifts a Result into a ResultAsyncValue.
+     * Note: Do NOT use liftResult(new Success(...)), use liftSuccess instead.
+     * Note: Do NOT use liftResult(generateFailure(...)), use liftFailure instead.
      * @param result - The Result to lift.
-     * @returns A ResultAsyncValue wrapping the Success value.
+     * @returns A ResultAsyncValue wrapping the Result.
      */
     liftResult<S>(result: Result<S>): ResultAsyncValue<S>;
 
     /**
      * Lifts a value into a ResultAsyncValue as a Success.
+     * Prefer this over liftResult(new Success(...)).
      * @param value - The value to lift.
-     * @returns A ResultAsyncValue wrapping the Success value.
+     * @returns A ResultAsyncValue wrapping the Success.
      */
     liftSuccess<S>(value: S): ResultAsyncValue<S>;
 
     /**
+     * Lifts a Failure into a ResultAsyncValue.
+     * Prefer this over liftResult(generateFailure(...)).
+     * @template T The type of the native error.
+     * @param parameters - The PureError parameters.
+     * @returns A ResultAsyncValue wrapping the Failure.
+     */
+    liftFailure<T extends NativeErrorType>(
+        parameters: PureErrorParameters<T>,
+    ): ResultAsyncValue<never>;
+
+    /**
      * Converts a Promise of a Result into a ResultAsyncValue.
      * @param promise - The Promise to convert.
-     * @returns A ResultAsyncValue wrapping the Success value.
+     * @returns A ResultAsyncValue wrapping the Result.
      */
     fromResultPromise<S>(promise: PromiseLike<Result<S>>): ResultAsyncValue<S>;
 
@@ -31,7 +48,7 @@ export interface ResultAsyncHelpers {
      * Converts a Promise into a ResultAsyncValue, using a failure handler for errors.
      * @param promise - The Promise to convert.
      * @param failure - A function to generate a Failure from an error.
-     * @returns A ResultAsyncValue wrapping the Success value or Failure.
+     * @returns A ResultAsyncValue wrapping the Result.
      */
     fromPromise<S>(
         promise: PromiseLike<S>,
@@ -41,13 +58,15 @@ export interface ResultAsyncHelpers {
 
 const resultAsyncHelpers: ResultAsyncHelpers = {
     liftResult<S>(result: Result<S>): ResultAsyncValue<S> {
-        if (result.isSuccess()) {
-            return Promise.resolve(result as Success<S>);
-        }
-        throw result;
+        return Promise.resolve(result);
     },
     liftSuccess<S>(value: S): ResultAsyncValue<S> {
         return Promise.resolve(new Success(value));
+    },
+    liftFailure<T extends NativeErrorType>(
+        parameters: PureErrorParameters<T>,
+    ): ResultAsyncValue<never> {
+        return Promise.resolve(generateFailure(parameters));
     },
     fromResultPromise<S>(promise: PromiseLike<Result<S>>): ResultAsyncValue<S> {
         return promise.then(
@@ -105,9 +124,6 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
         try {
             return await this.compute(resultAsyncHelpers);
         } catch (e) {
-            if (e instanceof Failure) {
-                return e;
-            }
             return generateFailure({
                 type: 'technicalIssue',
                 code: 'uncaughtException',
@@ -232,6 +248,9 @@ interface ResultAsyncFactory {
     ): ResultAsync<S>;
     liftResult<S>(result: Result<S>): ResultAsync<S>;
     liftSuccess<S>(value: S): ResultAsync<S>;
+    liftFailure<T extends NativeErrorType>(
+        parameters: PureErrorParameters<T>,
+    ): ResultAsync<never>;
     fromResultPromise<S>(promise: () => PromiseLike<Result<S>>): ResultAsync<S>;
     fromPromise<S>(
         promise: () => PromiseLike<S>,
@@ -249,6 +268,11 @@ export const ResultAsync: ResultAsyncFactory = Object.assign(
         },
         liftSuccess<S>(value: S): ResultAsync<S> {
             return ResultAsync(({ liftSuccess }) => liftSuccess(value));
+        },
+        liftFailure<T extends NativeErrorType>(
+            parameters: PureErrorParameters<T>,
+        ): ResultAsync<never> {
+            return ResultAsync(({ liftFailure }) => liftFailure(parameters));
         },
         fromResultPromise<S>(
             promise: () => PromiseLike<Result<S>>,

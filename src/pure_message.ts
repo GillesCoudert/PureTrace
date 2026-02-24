@@ -88,21 +88,29 @@ export type NativeErrorData<T extends NativeErrorType> = z.infer<
 //#region    ───── GENERATOR ─────
 
 /**
- * Generates a strongly-typed PureError message object.
+ * Parameters for generating a PureError.
  * @template T The native PureError type.
- * @param options PureError details and metadata.
- * @returns A validated PureError object.
  */
-export function generateError<T extends NativeErrorType>(options: {
+export type PureErrorParameters<T extends NativeErrorType> = {
     type: T;
     code: string;
     data?: NativeErrorData<T>;
     issuer?: string;
     localizedMessage?: LocalizedMessage;
-}): PureError {
+};
+
+/**
+ * Generates a strongly-typed PureError message object.
+ * @template T The native PureError type.
+ * @param parameters PureError details and metadata.
+ * @returns A validated PureError object.
+ */
+export function generateError<T extends NativeErrorType>(
+    parameters: PureErrorParameters<T>,
+): PureError {
     return {
         kind: 'error',
-        ...options,
+        ...parameters,
     } as PureError;
 }
 
@@ -142,25 +150,35 @@ type NativeMessageData<
 //#region    ───── GENERATOR ─────
 
 /**
- * Generates a strongly-typed PureMessage object.
+ * Parameters for generating a PureMessage.
  * @template K The PureMessage kind.
  * @template T The PureMessage type.
- * @param options PureMessage details and metadata.
- * @returns A validated PureMessage object.
  */
-export function generateMessage<
+export type GenerateMessageParameters<
     K extends NativeMessageKind,
     T extends NativeMessageType<K>,
->(options: {
+> = {
     kind: K;
     type: T;
     code: string;
     data?: NativeMessageData<K, T>;
     issuer?: string;
     localizedMessage?: LocalizedMessage;
-}): PureMessage {
+};
+
+/**
+ * Generates a strongly-typed PureMessage object.
+ * @template K The PureMessage kind.
+ * @template T The PureMessage type.
+ * @param parameters PureMessage details and metadata.
+ * @returns A validated PureMessage object.
+ */
+export function generateMessage<
+    K extends NativeMessageKind,
+    T extends NativeMessageType<K>,
+>(parameters: GenerateMessageParameters<K, T>): PureMessage {
     return {
-        ...options,
+        ...parameters,
     } as PureMessage;
 }
 
