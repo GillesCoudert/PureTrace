@@ -190,6 +190,11 @@ abstract class PureResult<S> {
     //#region                              OTHER METHODS                           #
     //#────────────────────────────────────────────────────────────────────────────#
 
+    /**
+     * Calls the provided function with the current result instance as a side-effect.
+     * @param f Function to call with the current result.
+     * @returns The current Result instance.
+     */
     public tap(f: (result: this) => void): Result<S> {
         f(this);
         return this as unknown as Result<S>;
@@ -197,6 +202,11 @@ abstract class PureResult<S> {
 
     //#region    ───── MONADS ─────
 
+    /**
+     * Chains a function over the current result, propagating existing traces to the new result.
+     * @param f Function to apply to the current result.
+     * @returns A new Result produced by the function, with existing traces added.
+     */
     public chain<S2>(f: (result: this) => Result<S2>): Result<S2> {
         return f(this).addTraces(...this.getTraces());
     }
@@ -323,6 +333,11 @@ export class Success<S> extends PureResult<S> {
 
     //#region    ───── MONADS ─────
 
+    /**
+     * Chains the success value using the provided function.
+     * @param f Function to apply to the success value.
+     * @returns A new Result produced by the function, with existing traces added.
+     */
     public chainSuccess<S2>(f: (value: S) => Result<S2>): Result<S2> {
         return f(this.value).addTraces(...this.getTraces());
     }
@@ -385,6 +400,10 @@ export class Failure extends PureResult<never> {
     //#region                            ERROR MANAGEMENT                          #
     //#────────────────────────────────────────────────────────────────────────────#
 
+    /**
+     * Retrieves the errors associated with this failure.
+     * @returns A copy of the errors.
+     */
     public getErrors(): PureError[] {
         return structuredClone(this.errors);
     }
@@ -422,10 +441,16 @@ export class Failure extends PureResult<never> {
 
     //#region    ───── INTROSPECTION ─────
 
+    /**
+     * Always returns false for Failure.
+     */
     public isSuccess(): this is Success<never> {
         return false;
     }
 
+    /**
+     * Always returns true for Failure.
+     */
     public isFailure(): this is Failure {
         return true;
     }
@@ -475,14 +500,30 @@ export class Failure extends PureResult<never> {
 
     //#region    ───── FUNCTORS ─────
 
+    /**
+     * Ignores mapping on success, returns this.
+     * @param _ Ignored function.
+     * @returns This instance.
+     */
     public mapSuccess<S2>(_: (value: never) => Success<S2>): Result<S2> {
         return this;
     }
 
+    /**
+     * Maps the failure errors using the provided function.
+     * @param f Function to apply to the failure errors.
+     * @returns A new Failure with mapped errors, with existing traces added.
+     */
     public mapFailure(f: (errors: PureMessage[]) => Failure): Result<never> {
         return f(this.getErrors()).addTraces(...this.getTraces());
     }
 
+    /**
+     * Applies the failure function, ignores the success function.
+     * @param _ Ignored success function.
+     * @param onFailure Function to apply on failure.
+     * @returns A new Result with the mapped failure.
+     */
     public mapBoth<S2>(
         _: (value: never) => Success<S2>,
         onFailure: (errors: PureMessage[]) => Failure,
@@ -494,16 +535,32 @@ export class Failure extends PureResult<never> {
 
     //#region    ───── MONADS ─────
 
+    /**
+     * Ignores chaining on success, returns this.
+     * @param _ Ignored function.
+     * @returns This instance.
+     */
     public chainSuccess<S2>(_: (value: never) => Result<S2>): Result<S2> {
         return this;
     }
 
+    /**
+     * Chains the failure errors using the provided function.
+     * @param f Function to apply to the failure errors.
+     * @returns A new Result produced by the function, with existing traces added.
+     */
     public chainFailure<S2>(
         f: (errors: PureMessage[]) => Result<S2>,
     ): Result<S2> {
         return f(this.getErrors()).addTraces(...this.getTraces());
     }
 
+    /**
+     * Applies the failure function, ignores the success function.
+     * @param _ Ignored success function.
+     * @param onFailure Function to apply on failure.
+     * @returns A new Result produced by the failure function.
+     */
     public chainBoth<S2, S3>(
         _: (value: never) => Result<S2>,
         onFailure: (errors: PureMessage[]) => Result<S3>,
@@ -511,6 +568,11 @@ export class Failure extends PureResult<never> {
         return this.chainFailure(onFailure);
     }
 
+    /**
+     * Converts this failure to a success using a default value, adding all errors and traces.
+     * @param defaultValue The default value to use for the success.
+     * @returns A Success instance with the default value.
+     */
     public convertFailureToSuccess(defaultValue: never): Success<never> {
         return new Success(defaultValue).addTraces(
             ...this.getErrors(),

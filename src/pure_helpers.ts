@@ -2,6 +2,12 @@ import z from 'zod';
 import { Failure, Result, Success } from './pure_result';
 import { PureError, generateError } from './pure_message';
 
+/**
+ * Parses unknown data against a Zod object schema and returns a Result.
+ * @param data The data to parse.
+ * @param contract The Zod object schema to validate against.
+ * @returns A Success with the parsed data, or a Failure with validation errors.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function pureZodParse<T extends z.ZodObject<any>>(
     data: unknown,
@@ -10,6 +16,11 @@ export function pureZodParse<T extends z.ZodObject<any>>(
     return convertZodParseResultToPureResult(contract.safeParse(data));
 }
 
+/**
+ * Converts a Zod safe parse result into a PureTrace Result.
+ * @param result The Zod safe parse result to convert.
+ * @returns A Success with the parsed output, or a Failure with PureError messages.
+ */
 export function convertZodParseResultToPureResult<TOutput>(
     result: z.ZodSafeParseResult<TOutput>,
 ): Result<TOutput> {
