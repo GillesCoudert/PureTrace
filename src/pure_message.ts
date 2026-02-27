@@ -54,6 +54,68 @@ export const errorSchema = messageSchema.extend({
 export type PureError = z.infer<typeof errorSchema>;
 
 //#────────────────────────────────────────────────────────────────────────────#
+//#region                              COMMON TYPES                            #
+//#────────────────────────────────────────────────────────────────────────────#
+
+/**
+ * Represents any valid JSON value.
+ *
+ * This type captures all possible JSON data types:
+ * - Primitives: null, boolean, number, string
+ * - Structures: arrays and objects
+ *
+ * The type is recursive to support nested JSON structures of arbitrary depth.
+ *
+ * @example
+ * ```typescript
+ * const simpleValue: Json = 'hello';
+ * const numberValue: Json = 42;
+ * const arrayValue: Json = [1, 2, 'three'];
+ * const objectValue: Json = { name: 'John', age: 30, active: true };
+ * const nestedValue: Json = {
+ *   user: { name: 'John', contacts: ['email', 'phone'] },
+ *   metadata: null
+ * };
+ * ```
+ */
+export type Json =
+    | null
+    | boolean
+    | number
+    | string
+    | Json[]
+    | { [key: string]: Json };
+
+/**
+ * Represents a plain JSON object with string keys and JSON values.
+ */
+export type JsonObject = { [key: string]: Json };
+
+/**
+ * Represents the shape of a Zod object schema where all values are JSON-compatible schemas.
+ */
+export type ZodJsonObjectShape = {
+    [key: string]: z.ZodJSONSchema;
+};
+
+/**
+ * Represents a Zod object schema with JSON-compatible fields.
+ * @template TBehavior The object parsing behavior (strip, passthrough, etc.).
+ */
+export type ZodJsonObject<
+    TBehavior extends z.core.$ZodObjectConfig = z.core.$strip,
+> = z.ZodObject<ZodJsonObjectShape, TBehavior>;
+
+/**
+ * Represents a Zod object schema with loose (passthrough) JSON-compatible fields.
+ */
+export type ZodAnyJsonObject = ZodJsonObject<z.core.$loose>;
+
+//#────────────────────────────────────────────────────────────────────────────#
+//#endregion                           COMMON TYPES                            #
+//#────────────────────────────────────────────────────────────────────────────#
+
+//#────────────────────────────────────────────────────────────────────────────#
 //#region                              NATIVE ERRORS                           #
 //#────────────────────────────────────────────────────────────────────────────#
 
@@ -62,8 +124,8 @@ export type PureError = z.infer<typeof errorSchema>;
 type NativeErrorDefinitions = {
     readonly pureTraceInternalError: z.ZodObject<
         {
-            pureMessage: z.ZodObject<z.core.$ZodLooseShape, z.core.$loose>;
-            zodError: z.ZodObject<z.core.$ZodLooseShape, z.core.$loose>;
+            pureMessage: ZodAnyJsonObject;
+            zodError: ZodAnyJsonObject;
         },
         z.core.$strip
     >;
@@ -129,8 +191,8 @@ export function generateError<T extends NativeErrorType>(
 type NativeMessageDefinitions = {
     pureError: NativeErrorDefinitions;
     information: {
-        warning: z.ZodJSONSchema;
-        information: z.ZodJSONSchema;
+        warning: ZodAnyJsonObject;
+        information: ZodAnyJsonObject;
     };
     metric: {
         start: z.ZodISODateTime;
