@@ -110,8 +110,8 @@ export interface ResultAsync<S> extends PromiseLike<Result<S>> {
         onFailure: (errors: PureMessage[]) => PromiseLike<Result<S2>>,
     ): ResultAsync<S | S2>;
     chainBoth<S2, S3>(
-        onSuccess: (value: S) => PromiseLike<Result<S3>>,
-        onFailure: (errors: PureMessage[]) => PromiseLike<Result<S2>>,
+        onSuccess: (value: S) => PromiseLike<Result<S2>>,
+        onFailure: (errors: PureMessage[]) => PromiseLike<Result<S3>>,
     ): ResultAsync<S2 | S3>;
 }
 
@@ -224,8 +224,8 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
     }
 
     chainBoth<S2, S3>(
-        nextSuccess: (value: S) => PromiseLike<Result<S3>>,
-        nextFailure: (errors: PureMessage[]) => PromiseLike<Result<S2>>,
+        nextSuccess: (value: S) => PromiseLike<Result<S2>>,
+        nextFailure: (errors: PureMessage[]) => PromiseLike<Result<S3>>,
     ): ResultAsync<S2 | S3> {
         return ResultAsync(async (helpers) => {
             const result = await this.resolve();

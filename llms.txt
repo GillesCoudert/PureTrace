@@ -1,0 +1,313 @@
+# @gilles-coudert/pure-trace
+
+> Standardized, localizable, and traceable error handling for TypeScript — the foundation of the PureFramework.
+
+## Position in the PureFramework Stack
+
+PureTrace is the **absolute foundation**. It has zero `@gilles-coudert/*` dependencies.
+Every other PureFramework library depends on it. If you are using any PureFramework library,
+you are already using PureTrace.
+
+```
+PureTrace  ← you are here
+├── PureDomain
+├── PureArchitecture
+│   └── PureArchitecture-EntityManagement
+│       └── PureArchitecture-Auth
+```
+
+Peer dependency: `zod ^4.0.0`
+
+## Core Concepts
+
+### Result<S> — The central type
+
+`Result<S>` is a discriminated union: `Success<S> | Failure`.
+Every operation that can fail returns a `Result` instead of throwing.
+This eliminates uncaught exceptions and makes error paths explicit in the type system.
+
+```typescript
+import { Result, Success, Failure, generateFailure } from '@gilles-coudert/pure-trace';
+
+function divide(a: number, b: number): Result<number> {
+    if (b === 0) {
+        return generateFailure({
+            type: 'processError',
+            code: 'divisionByZero',
+        });
+    }
+    return new Success(a / b);
+}
+
+const result = divide(10, 2);
+if (result.isSuccess()) {
+    console.log(result.value); // 5 — TypeScript narrows to Success<number>
+}
+if (result.isFailure()) {
+    console.log(result.getErrors()); // TypeScript narrows to Failure
+}
+```
+
+**Key design decision:** `isSuccess()` and `isFailure()` are type guards.
+After calling one, TypeScript narrows the type. Always use them — never cast.
+
+### Success<S>
+
+Wraps a successful value. The value is accessible via the `value` property.
+
+```typescript
+const success = new Success({ id: 1, name: 'Alice' });
+console.log(success.value.name); // 'Alice'
+```
+
+### Failure
+
+Wraps one or more `PureError` objects. Errors are accessed via `getErrors()`.
+A single Failure can accumulate multiple errors (useful for validation).
+
+```typescript
+const failure = new Failure(
+    generateError({ type: 'processError', code: 'missingField', data: { field: 'email' } }),
+    generateError({ type: 'processError', code: 'missingField', data: { field: 'name' } }),
+);
+console.log(failure.getErrors().length); // 2
+```
+
+### PureMessage and PureError
+
+`PureMessage` is a structured, Zod-validated message with these fields:
+- `kind`: category (`'error'`, `'information'`, `'metric'`)
+- `type`: subcategory within the kind
+- `code`: machine-readable identifier (your domain-specific error code)
+- `data`: optional arbitrary JSON payload
+- `issuer`: optional string identifying the source
+- `localizedMessage`: optional `{ locale, message }` for user-facing text
+
+`PureError` is a `PureMessage` with `kind: 'error'`. It is the only type that goes into a `Failure`.
+
+**Native error types** (the `type` field for errors):
+- `'processError'` — business/domain errors (validation failures, rule violations)
+- `'technicalIssue'` — infrastructure errors (network, I/O, unexpected exceptions)
+- `'pureTraceInternalError'` — internal framework errors (you should never generate these)
+
+```typescript
+import { generateError, generateFailure } from '@gilles-coudert/pure-trace';
+
+// Creating a standalone error
+const error = generateError({
+    type: 'processError',
+    code: 'userNotFound',
+    data: { userId: '42' },
+    issuer: 'UserRepository',
+    localizedMessage: { locale: 'en', message: 'User not found' },
+});
+
+// Creating a Failure directly from error parameters
+const failure = generateFailure({
+    type: 'processError',
+    code: 'userNotFound',
+});
+```
+
+### Traces
+
+Both `Success` and `Failure` carry an ordered list of `PureMessage` traces.
+Traces are observability metadata — they propagate through chains and transformations,
+allowing you to reconstruct the full execution path.
+
+```typescript
+import { Success, generateMessage } from '@gilles-coudert/pure-trace';
+
+const result = new Success(42);
+result.addTraces(
+    generateMessage({ kind: 'metric', type: 'start', code: 'fetchUser', data: new Date().toISOString() }),
+);
+console.log(result.getTraces()); // [{ kind: 'metric', type: 'start', code: 'fetchUser', ... }]
+```
+
+Traces propagate automatically through `chainSuccess`, `mapSuccess`, etc.
+You do not need to manually forward them.
+
+### ResultAsync<S> — Async operations
+
+`ResultAsync<S>` wraps an asynchronous `Result` computation with the same combinators
+as `Result` (tap, map, chain), but operating on `Promise<Result<S>>` under the hood.
+It implements `PromiseLike<Result<S>>`, so you can `await` it directly.
+
+```typescript
+import { ResultAsync, Success, Failure } from '@gilles-coudert/pure-trace';
+
+// From a deferred computation
+const fetchUser = ResultAsync<User>(async ({ liftSuccess, liftFailure }) => {
+    const response = await fetch('/api/users/1');
+    if (!response.ok) {
+        return liftFailure({ type: 'technicalIssue', code: 'httpError' });
+    }
+    return liftSuccess(await response.json() as User);
+});
+
+// From an existing Promise
+const fromPromise = ResultAsync.fromPromise(
+    () => fetch('/api/users/1').then(r => r.json()),
+    (error) => new Failure(generateError({ type: 'technicalIssue', code: 'fetchFailed' })),
+);
+
+// Resolving
+const result = await fetchUser.resolve(); // Result<User>
+// or simply: const result = await fetchUser; // also Result<User>
+```
+
+**Static factory methods on `ResultAsync`:**
+- `ResultAsync(compute)` — create from a deferred computation
+- `ResultAsync.liftResult(result)` — wrap an existing `Result`
+- `ResultAsync.liftSuccess(value)` — wrap a value as `Success`
+- `ResultAsync.liftFailure(params)` — create a `Failure` from error parameters
+- `ResultAsync.fromResultPromise(fn)` — wrap a `() => PromiseLike<Result<S>>`
+- `ResultAsync.fromPromise(fn, failure)` — wrap a `() => PromiseLike<S>` with rejection handler
+
+### Zod integration — pureZodParse
+
+Bridges Zod schema validation into the `Result` type:
+
+```typescript
+import z from 'zod';
+import { pureZodParse } from '@gilles-coudert/pure-trace';
+
+const userSchema = z.object({ name: z.string(), age: z.number().min(0) });
+const result = pureZodParse(unknownData, userSchema);
+// Result<{ name: string; age: number }>
+```
+
+Custom Zod issues (with `code: 'custom'`) are converted to individual `PureError` entries.
+Standard Zod issues are aggregated into a single `processError` with code `'zodParseFailed'`.
+
+### GetResult — Utility class
+
+- `GetResult.fromThrowable(fn, onError)` — wraps a throwing function into a `Result`
+- `GetResult.fromResultArray(results, firstFailureOnly?)` — aggregates `Result<X>[]` into `Result<X[]>`
+- `GetResult.fromResultArrayAsSuccess(results)` — always returns `Success<X[]>`, moving errors to traces
+
+## Patterns
+
+### Chain operations (railway-oriented programming)
+
+Use `chainSuccess` to sequence operations that each return a `Result`.
+On first `Failure`, the chain short-circuits — subsequent steps are skipped.
+
+```typescript
+function validateInput(raw: unknown): Result<Input> { /* ... */ }
+function processInput(input: Input): Result<Output> { /* ... */ }
+function formatOutput(output: Output): Result<string> { /* ... */ }
+
+const result = validateInput(rawData)
+    .chainSuccess(processInput)
+    .chainSuccess(formatOutput);
+// Result<string> — either the final string or the first Failure encountered
+```
+
+### Async chaining
+
+```typescript
+const result = await ResultAsync.liftSuccess(userId)
+    .chainSuccess((id) => fetchUser(id))          // returns PromiseLike<Result<User>>
+    .chainSuccess((user) => fetchOrders(user.id))  // returns PromiseLike<Result<Order[]>>
+    .resolve();
+```
+
+### Side effects with tap
+
+Use `tap`, `tapSuccess`, `tapFailure` for logging or metrics without altering the result:
+
+```typescript
+const result = fetchUser(id)
+    .tapSuccess((s) => logger.info('User found', s.value))
+    .tapFailure((f) => logger.error('User fetch failed', f.getErrors()));
+```
+
+### Recovering from failures
+
+```typescript
+// Convert Failure to Success with a default
+const result = riskyOperation().convertFailureToSuccess(defaultValue);
+
+// Or use chainFailure for conditional recovery
+const result = riskyOperation().chainFailure((errors) => {
+    if (errors.some(e => e.code === 'notFound')) {
+        return new Success(fallbackValue);
+    }
+    return new Failure(...errors);
+});
+```
+
+## Anti-patterns
+
+### Throwing exceptions instead of returning Result
+
+```typescript
+// WRONG — defeats the purpose of the library
+function findUser(id: string): Result<User> {
+    const user = db.find(id);
+    if (!user) throw new Error('not found'); // DO NOT throw
+    return new Success(user);
+}
+
+// CORRECT
+function findUser(id: string): Result<User> {
+    const user = db.find(id);
+    if (!user) return generateFailure({ type: 'processError', code: 'userNotFound' });
+    return new Success(user);
+}
+```
+
+### Unwrapping Result with type assertions
+
+```typescript
+// WRONG — bypasses type safety
+const value = (result as Success<User>).value;
+
+// CORRECT — use type guards
+if (result.isSuccess()) {
+    const value = result.value; // narrowed
+}
+```
+
+### Ignoring traces
+
+Traces are not decorative. They carry observability data across the call stack.
+Do not create new `Success`/`Failure` instances to discard traces when chaining manually.
+Use the built-in combinators (`chainSuccess`, `mapSuccess`, etc.) which propagate traces automatically.
+
+### Using generateFailure with type 'pureTraceInternalError'
+
+This type is reserved for the framework's internal validation. Use `'processError'` for domain
+errors and `'technicalIssue'` for infrastructure errors.
+
+## Integration with Other Layers
+
+When using **PureDomain**: Entity creation and validation methods return `Result<Entity>`.
+Validation failures use `generateFailure` with `type: 'processError'`.
+
+When using **PureArchitecture**: Use cases return `ResultAsync<Output>`.
+Controllers resolve `ResultAsync` and map `Failure` to HTTP responses or equivalent.
+
+When using **PureArchitecture-EntityManagement**: Repository operations and interactors
+return `ResultAsync`. All CRUD errors flow through the `Result` pipeline.
+
+## Quick Reference
+
+| Export | Purpose |
+|--------|---------|
+| `Result<S>` | Union type: `Success<S> \| Failure` |
+| `Success<S>` | Wraps a successful value with traces |
+| `Failure` | Wraps one or more `PureError` with traces |
+| `ResultAsync<S>` | Async `Result` with chainable combinators, implements `PromiseLike` |
+| `PureMessage` | Structured message (kind, type, code, data, issuer, localizedMessage) |
+| `PureError` | `PureMessage` with `kind: 'error'` |
+| `generateError(params)` | Creates a `PureError` from typed parameters |
+| `generateFailure(params)` | Creates a `Failure` from typed parameters (shorthand) |
+| `generateMessage(params)` | Creates a `PureMessage` (for traces, metrics, info) |
+| `pureZodParse(data, schema)` | Validates data against a Zod schema, returns `Result` |
+| `convertZodParseResultToPureResult(zodResult)` | Converts a Zod `SafeParseResult` to `Result` |
+| `GetResult.fromThrowable(fn, onError)` | Wraps a throwing function into `Result` |
+| `GetResult.fromResultArray(results, firstFailureOnly?)` | Aggregates `Result[]` into `Result<T[]>` (stops at first failure by default) |
+| `GetResult.fromResultArrayAsSuccess(results)` | Always `Success`, errors become traces |
