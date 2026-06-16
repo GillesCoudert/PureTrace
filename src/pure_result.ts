@@ -586,14 +586,12 @@ export class GetResult {
                 //> > en: In case of Failure
                 //>
                 if (!failure) {
-                    failure = result;
-                    failure.addTraces(...traces);
-                    if (firstFailureOnly) {
-                        return failure;
-                    }
-                } else {
+                    //> ?! ─────────────────── ?!
+                    //> ?! fr: Première erreur ?!
+                    //> ?! ─────────────────── ?!
+                    failure = new Failure(...result.getErrors());
+                } else if (!firstFailureOnly) {
                     failure.addErrors(result.getErrors());
-                    failure.addTraces(...traces);
                 }
             } else {
                 //>
@@ -604,7 +602,7 @@ export class GetResult {
             }
         }
         if (failure) {
-            return failure;
+            return failure.addTraces(...traces);
         }
         return new Success(successes).addTraces(...traces);
     }

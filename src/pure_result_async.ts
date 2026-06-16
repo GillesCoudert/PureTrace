@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
+import { serializeUnknown } from './pure_helpers';
 import {
     PureMessage,
     NativeErrorType,
@@ -52,7 +53,7 @@ export interface ResultAsyncHelpers {
      */
     fromPromise<S>(
         promise: PromiseLike<S>,
-        failure: (reason: unknown) => Failure,
+        failure: ((reason: unknown) => Failure) | Failure,
     ): ResultAsyncValue<S>;
 }
 
@@ -102,7 +103,9 @@ export interface ResultAsync<S> extends PromiseLike<Result<S>> {
         onSuccess: (value: S) => Success<S2>,
         onFailure: (errors: PureMessage[]) => Failure,
     ): ResultAsync<S2>;
-    chain<S2>(next: (result: Result<S>) => ResultAsync<S2>): ResultAsync<S2>;
+    chain<S2>(
+        next: (result: Result<S>) => PromiseLike<Result<S2>>,
+    ): ResultAsync<S2>;
     chainSuccess<S2>(
         onSuccess: (value: S) => PromiseLike<Result<S2>>,
     ): ResultAsync<S2>;
@@ -127,9 +130,7 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
             return generateFailure({
                 type: 'technicalIssue',
                 code: 'uncaughtException',
-                data: {
-                    message: JSON.stringify(e),
-                },
+                data: serializeUnknown(e),
             });
         }
     }
@@ -283,7 +284,7 @@ export const ResultAsync: ResultAsyncFactory = Object.assign(
         },
         fromPromise<S>(
             promise: () => PromiseLike<S>,
-            failure: (reason: unknown) => Failure,
+            failure: ((reason: unknown) => Failure) | Failure,
         ): ResultAsync<S> {
             return ResultAsync(({ fromPromise }) =>
                 fromPromise(promise(), failure),

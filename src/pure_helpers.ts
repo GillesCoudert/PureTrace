@@ -1,6 +1,6 @@
 import z from 'zod';
 import { Failure, Result, Success } from './pure_result';
-import { PureError, generateError } from './pure_message';
+import { Json, JsonObject, PureError, generateError } from './pure_message';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function pureZodParse<T extends z.ZodObject<any>>(
@@ -54,3 +54,232 @@ export function convertZodParseResultToPureResult<TOutput>(
         return new Failure(...errorMessages);
     }
 }
+
+//#────────────────────────────────────────────────────────────────────────────#
+//#region                       UNKNOWN VALUE SERIALIZATION                    #
+//#────────────────────────────────────────────────────────────────────────────#
+
+/**
+ * Options for {@link serializeUnknown}.
+ */
+export interface SerializeUnknownOptions {
+    /**
+     * Maximum recursion depth before truncation. Defaults to 10.
+     * Beyond this depth, the value is replaced by '[MaxDepthReached]'.
+     */
+    maxDepth?: number;
+}
+
+const DEFAULT_MAX_DEPTH = 10;
+
+/**
+ * Serializes any unknown value into a Json-safe representation, never throwing.
+ *
+ * Coverage beyond JSON.stringify:
+ * - Errors (including subclasses, AggregateError, the cause chain, and own
+ *   custom enumerable properties) — preserves non-enumerable name/message/stack.
+ * - Date → ISO string (Invalid Date → null).
+ * - RegExp → `{ source, flags }`.
+ * - Map → array of `[key, value]` pairs (preserves order and non-string keys).
+ * - Set → array of values.
+ * - bigint, symbol, function → human-readable string form.
+ * - NaN, Infinity, -Infinity → string form (JSON has no native representation).
+ * - Circular references → '[Circular]'.
+ * - Recursion exceeding `maxDepth` → '[MaxDepthReached]'.
+ * - Property accessors that throw → '[ThrowingAccessor]' (the rest of the
+ *   object is preserved).
+ *
+ * Intended for observability use cases where preserving information matters
+ * more than round-trip fidelity (typed values become strings; this is a
+ * one-way transformation).
+ *
+ * @param value The value to serialize.
+ * @param options Optional configuration.
+ * @returns A Json-safe representation. Never throws.
+ *
+ * @example
+ * ```typescript
+ * import { serializeUnknown } from '@gilles-coudert/pure-trace';
+ *
+ * try {
+ *     riskyOperation();
+ * } catch (e: unknown) {
+ *     const safe = serializeUnknown(e);
+ *     console.log(JSON.stringify(safe));
+ * }
+ * ```
+ */
+export function serializeUnknown(
+    value: unknown,
+    options: SerializeUnknownOptions = {},
+): Json {
+    const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
+    try {
+        return serializeRecursive(value, maxDepth, new WeakSet());
+    } catch {
+        //>
+        //> > fr: Filet de sécurité absolu : on ne propage jamais d'exception.
+        //> > en: Absolute safety net: an exception is never propagated.
+        //>
+        return '[SerializationFailed]';
+    }
+}
+
+function serializeRecursive(
+    value: unknown,
+    depthRemaining: number,
+    seen: WeakSet<object>,
+): Json {
+    //>
+    //> > fr: Cas primitifs (chemin rapide).
+    //> > en: Primitive cases (fast path).
+    //>
+    if (value === null || value === undefined) return null;
+    const valueType = typeof value;
+    if (valueType === 'boolean') return value as boolean;
+    if (valueType === 'string') return value as string;
+    if (valueType === 'number') {
+        const numericValue = value as number;
+        if (Number.isFinite(numericValue)) return numericValue;
+        if (Number.isNaN(numericValue)) return 'NaN';
+        return numericValue > 0 ? 'Infinity' : '-Infinity';
+    }
+    if (valueType === 'bigint') return (value as bigint).toString();
+    if (valueType === 'symbol') return (value as symbol).toString();
+    if (valueType === 'function') {
+        const functionName = (value as { name?: string }).name;
+        return `[Function: ${
+            functionName && functionName.length > 0 ? functionName : 'anonymous'
+        }]`;
+    }
+
+    //>
+    //> > fr: Garde de profondeur.
+    //> > en: Depth guard.
+    //>
+    if (depthRemaining <= 0) return '[MaxDepthReached]';
+
+    const objectValue = value as object;
+
+    //>
+    //> > fr: Détection de référence circulaire.
+    //> > en: Circular reference detection.
+    //>
+    if (seen.has(objectValue)) return '[Circular]';
+    seen.add(objectValue);
+
+    try {
+        if (value instanceof Date) {
+            return Number.isNaN(value.getTime()) ? null : value.toISOString();
+        }
+        if (value instanceof RegExp) {
+            return { source: value.source, flags: value.flags };
+        }
+        if (value instanceof Error) {
+            return serializeErrorInstance(value, depthRemaining - 1, seen);
+        }
+        if (value instanceof Map) {
+            const pairs: Json[] = [];
+            for (const [mapKey, mapValue] of value.entries()) {
+                pairs.push([
+                    serializeRecursive(mapKey, depthRemaining - 1, seen),
+                    serializeRecursive(mapValue, depthRemaining - 1, seen),
+                ]);
+            }
+            return pairs;
+        }
+        if (value instanceof Set) {
+            const items: Json[] = [];
+            for (const item of value) {
+                items.push(serializeRecursive(item, depthRemaining - 1, seen));
+            }
+            return items;
+        }
+        if (Array.isArray(value)) {
+            return value.map((item) =>
+                serializeRecursive(item, depthRemaining - 1, seen),
+            );
+        }
+        return serializePlainObject(objectValue, depthRemaining - 1, seen);
+    } finally {
+        //>
+        //> > fr: Retrait après visite — autorise les répétitions non cycliques (siblings).
+        //> > en: Remove after visit — allows non-cyclic repeated occurrences (siblings).
+        //>
+        seen.delete(objectValue);
+    }
+}
+
+function serializeErrorInstance(
+    err: Error,
+    depthRemaining: number,
+    seen: WeakSet<object>,
+): JsonObject {
+    const result: JsonObject = {
+        name: err.name,
+        message: err.message,
+    };
+    if (err.stack !== undefined) {
+        result.stack = err.stack;
+    }
+    if (err.cause !== undefined) {
+        result.cause = serializeRecursive(err.cause, depthRemaining, seen);
+    }
+    //>
+    //> > fr: AggregateError — sérialisation explicite de la liste interne.
+    //> > en: AggregateError — explicit serialization of the internal list.
+    //>
+    const aggregatedErrors = (err as { errors?: unknown }).errors;
+    if (Array.isArray(aggregatedErrors)) {
+        result.errors = aggregatedErrors.map((entry) =>
+            serializeRecursive(entry, depthRemaining, seen),
+        );
+    }
+    //>
+    //> > fr: Préservation des propriétés énumérables propres (champs custom des sous-classes).
+    //> > en: Preserve own enumerable properties (custom fields on subclasses).
+    //>
+    for (const propertyKey of Object.keys(err)) {
+        if (propertyKey in result) continue;
+        try {
+            result[propertyKey] = serializeRecursive(
+                (err as unknown as Record<string, unknown>)[propertyKey],
+                depthRemaining,
+                seen,
+            );
+        } catch {
+            result[propertyKey] = '[ThrowingAccessor]';
+        }
+    }
+    return result;
+}
+
+function serializePlainObject(
+    obj: object,
+    depthRemaining: number,
+    seen: WeakSet<object>,
+): JsonObject {
+    const result: JsonObject = {};
+    let propertyKeys: string[];
+    try {
+        propertyKeys = Object.keys(obj);
+    } catch {
+        return { '[unreadableKeys]': true };
+    }
+    for (const propertyKey of propertyKeys) {
+        try {
+            result[propertyKey] = serializeRecursive(
+                (obj as Record<string, unknown>)[propertyKey],
+                depthRemaining,
+                seen,
+            );
+        } catch {
+            result[propertyKey] = '[ThrowingAccessor]';
+        }
+    }
+    return result;
+}
+
+//#────────────────────────────────────────────────────────────────────────────#
+//#endregion                    UNKNOWN VALUE SERIALIZATION                    #
+//#────────────────────────────────────────────────────────────────────────────#

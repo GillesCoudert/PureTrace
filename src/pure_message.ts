@@ -65,8 +65,10 @@ export type PureError = z.infer<typeof errorSchema>;
  * - Structures: arrays and objects
  *
  * The type is recursive to support nested JSON structures of arbitrary depth.
- * Object values allow `undefined` to remain compatible with TypeScript types
- * that use optional properties (which implicitly add `| undefined` to their value type).
+ * It is structurally identical to Zod's `JSONType` (the inferred type of `z.json()`),
+ * which means values of this type are interchangeable with Zod JSON schemas without
+ * casts. `undefined` is intentionally excluded since it is not a valid JSON value
+ * (`JSON.stringify` drops `undefined` properties).
  *
  * @example
  * ```typescript
@@ -86,19 +88,23 @@ export type Json =
     | number
     | string
     | Json[]
-    | { [key: string]: Json | undefined };
+    | { [key: string]: Json };
 
 /**
  * Represents a plain JSON object with string keys and JSON values.
- * Values allow `undefined` to remain compatible with TypeScript types that use optional properties.
+ *
+ * @example
+ * ```typescript
+ * const payload: JsonObject = { id: 'abc', count: 3, tags: ['a', 'b'] };
+ * ```
  */
-export type JsonObject = { [key: string]: Json | undefined };
+export type JsonObject = { [key: string]: Json };
 
 /**
  * Represents the shape of a Zod object schema where all values are JSON-compatible schemas.
  */
 export type ZodJsonObjectShape = {
-    [key: string]: z.ZodType<Json | undefined>;
+    [key: string]: z.ZodType<Json>;
 };
 
 /**
