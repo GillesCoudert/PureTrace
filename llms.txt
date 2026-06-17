@@ -66,10 +66,10 @@ Wraps one or more `PureError` objects. Errors are accessed via `getErrors()`.
 A single Failure can accumulate multiple errors (useful for validation).
 
 ```typescript
-const failure = new Failure(
+const failure = new Failure([
     generateError({ type: 'processError', code: 'missingField', data: { field: 'email' } }),
     generateError({ type: 'processError', code: 'missingField', data: { field: 'name' } }),
-);
+]);
 console.log(failure.getErrors().length); // 2
 ```
 
@@ -141,9 +141,9 @@ allowing you to reconstruct the full execution path.
 import { Success, generateMessage } from '@gilles-coudert/pure-trace';
 
 const result = new Success(42);
-result.addTraces(
+result.addTraces([
     generateMessage({ kind: 'metric', type: 'start', code: 'fetchUser', data: new Date().toISOString() }),
-);
+]);
 console.log(result.getTraces()); // [{ kind: 'metric', type: 'start', code: 'fetchUser', ... }]
 ```
 
@@ -176,7 +176,7 @@ const fetchUser = ResultAsync<User>(async ({ liftSuccess, liftFailure }) => {
 // From an existing Promise
 const fromPromise = ResultAsync.fromPromise(
     () => fetch('/api/users/1').then(r => r.json()),
-    (error) => new Failure(generateError({ type: 'technicalIssue', code: 'fetchFailed' })),
+    (error) => new Failure([generateError({ type: 'technicalIssue', code: 'fetchFailed' })]),
 );
 
 // Consuming: compose and RETURN. You stay in ResultAsync — no await here.
@@ -295,7 +295,7 @@ const result = riskyOperation().chainFailure((errors) => {
     if (errors.some(e => e.code === 'notFound')) {
         return new Success(fallbackValue);
     }
-    return new Failure(...errors);
+    return new Failure(errors);
 });
 ```
 

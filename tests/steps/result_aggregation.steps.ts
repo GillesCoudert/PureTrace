@@ -47,7 +47,7 @@ defineFeature(feature, (test) => {
 
         given(/^a success carrying the traces "(.*)"$/, (codes: string) => {
             results.push(
-                new Success<unknown>(1).addTraces(...tracesFromCodes(codes)),
+                new Success<unknown>(1, tracesFromCodes(codes)),
             );
         });
 
@@ -83,7 +83,7 @@ defineFeature(feature, (test) => {
 
         and(/^a success carrying the traces "(.*)"$/, (codes: string) => {
             results.push(
-                new Success<unknown>(1).addTraces(...tracesFromCodes(codes)),
+                new Success<unknown>(1, tracesFromCodes(codes)),
             );
         });
 
@@ -120,7 +120,7 @@ function tracesFromCodes(codes: string): PureMessage[] {
 
 function buildFailureWithTraces(codes: string): Result<unknown> {
     const failure = generateFailure({ type: 'processError', code: 'e1' });
-    failure.addTraces(...tracesFromCodes(codes));
+    failure.addTraces(tracesFromCodes(codes));
     return failure;
 }
 

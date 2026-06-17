@@ -42,13 +42,13 @@ isFailure(): boolean
 getTraces(): PureMessage[]
 ```
 
-Returns all trace messages (errors included), in order.
+Returns the trace messages, in order. A shallow copy — the messages themselves are immutable.
 
 ```ts
 getErrors(): PureError[] // Failure only
 ```
 
-Returns messages with `kind: 'error'`.
+Returns the errors (`kind: 'error'`). A shallow copy — the errors themselves are immutable.
 
 ### Transformations
 
@@ -120,14 +120,20 @@ Executes the appropriate function depending on the result type without transform
 ### Trace management
 
 ```ts
-addTraces(...traces: PureMessage[]): this
+addTraces(traces: readonly PureMessage[]): void
 ```
 
 ```ts
-addErrors(errors: PureError[]): this // Failure only
+addErrors(errors: readonly PureError[]): void // Failure only
 ```
 
-Both `addTraces` and `addErrors` append the given messages as-is and perform **no runtime validation**: callers are trusted through the types. Validate untrusted or external input at the boundary with `pureZodParse` instead.
+`addTraces` and `addErrors` mutate the current instance in place (non-fluent) and perform **no runtime validation**: callers are trusted through the types. They are meant for the build phase, while you still own the result and have not handed it to the library. Validate untrusted or external input at the boundary with `pureZodParse` instead.
+
+```ts
+cloneWithTraces(ambient: readonly PureMessage[]): Result<S>
+```
+
+Returns a **new** result of the same variant, carrying this result's own messages followed by the given ambient traces. Never mutates the source — this is how the library propagates traces across combinators without touching results it receives.
 
 ## Success&lt;S&gt;
 
@@ -141,7 +147,7 @@ Constructors:
 
 ```ts
 new Success(value: S)
-new Success(value: S, initialTrace: PureMessage)
+new Success(value: S, traces?: readonly PureMessage[])
 ```
 
 ## Failure
@@ -153,7 +159,7 @@ class Failure
 Constructors:
 
 ```ts
-new Failure(...errors: PureError[])
+new Failure(errors?: readonly PureError[], traces?: readonly PureMessage[])
 ```
 
 ## ResultAsync&lt;S&gt;
@@ -436,14 +442,14 @@ const zodResult = schema.safeParse({ name: 'Alice' });
 
 const result = convertZodParseResultToPureResult(zodResult).tap((r) => {
     if (r.isSuccess()) {
-        r.addTraces(
+        r.addTraces([
             generateMessage({
                 kind: 'information',
                 type: 'information',
                 code: 'userValidated',
                 data: { name: r.value.name },
             }),
-        );
+        ]);
     }
 });
 

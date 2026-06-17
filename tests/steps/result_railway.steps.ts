@@ -172,14 +172,14 @@ defineFeature(feature, (test) => {
         given(
             /^a success with the value (\d+) carrying the trace "(.*)"$/,
             (value: string, code: string) => {
-                result = new Success(Number(value), trace(code));
+                result = new Success(Number(value), [trace(code)]);
             },
         );
         when(
             /^I chainSuccess to a success that adds the trace "(.*)"$/,
             (code: string) => {
                 result = result.chainSuccess(
-                    (value) => new Success(value * 10, trace(code)),
+                    (value) => new Success(value * 10, [trace(code)]),
                 );
             },
         );
@@ -205,7 +205,7 @@ defineFeature(feature, (test) => {
                 result = generateFailure({
                     type: 'processError',
                     code,
-                }).addTraces(trace(traceCode));
+                }).cloneWithTraces([trace(traceCode)]);
             },
         );
         when(

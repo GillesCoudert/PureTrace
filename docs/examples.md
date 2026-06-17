@@ -95,8 +95,8 @@ const result = processUser(data).mapFailure((errors) => {
     );
 
     return processErrors.length > 0
-        ? new Failure(...processErrors)
-        : new Failure(...errors);
+        ? new Failure(processErrors)
+        : new Failure(errors);
 });
 ```
 
@@ -150,27 +150,27 @@ const result = await ResultAsync.fromPromise(
 
 ```ts
 const result = processOrder(order).tap((r) => {
-    r.addTraces(
+    r.addTraces([
         generateMessage({
             kind: 'metric',
             type: 'start',
             code: 'orderProcessingStarted',
             data: { orderId: order.id, timestamp: Date.now() },
         }),
-    );
+    ]);
 });
 ```
 
 ```ts
 const result = processOrder(order).tap((r) => {
-    r.addTraces(
+    r.addTraces([
         generateMessage({
             kind: 'metric',
             type: 'stop',
             code: 'orderProcessingFinished',
             data: { orderId: order.id, timestamp: Date.now() },
         }),
-    );
+    ]);
 });
 ```
 
@@ -247,28 +247,28 @@ async function fetchWithRetry<T>(
 
         if (result.isSuccess()) {
             return result.mapSuccess((value) =>
-                new Success(value).addTraces(
+                new Success(value, [
                     generateMessage({
                         kind: 'information',
                         type: 'information',
                         code: 'retrySucceeded',
                         data: { attempt },
                     }),
-                ),
+                ]),
             );
         }
 
         lastFailure = result as Failure;
     }
 
-    return lastFailure!.addTraces(
+    return lastFailure!.cloneWithTraces([
         generateMessage({
             kind: 'information',
             type: 'information',
             code: 'retryExhausted',
             data: { retries },
         }),
-    );
+    ]);
 }
 ```
 
@@ -340,7 +340,7 @@ function registerUser(
     data: unknown,
 ): Result<{ username: string; email: string; age: number }> {
     return pureZodParse(data, registrationSchema).mapFailure((errors) =>
-        new Failure(...errors).addTraces(
+        new Failure(errors, [
             generateMessage({
                 kind: 'information',
                 type: 'warning',
@@ -348,7 +348,7 @@ function registerUser(
                 data: { timestamp: Date.now() },
                 issuer: 'userService',
             }),
-        ),
+        ]),
     );
 }
 
@@ -418,14 +418,14 @@ const result = validateRegistration({
     role: 'user',
 }).tap((r) => {
     if (r.isFailure()) {
-        r.addTraces(
+        r.addTraces([
             generateMessage({
                 kind: 'information',
                 type: 'warning',
                 code: 'registrationFailed',
                 data: { timestamp: Date.now() },
             }),
-        );
+        ]);
     }
 });
 
@@ -470,17 +470,17 @@ function handleApiRequest(
                     },
                 }),
             );
-            return new Failure(...apiErrors);
+            return new Failure(apiErrors);
         })
         .mapSuccess((value) =>
-            new Success(value).addTraces(
+            new Success(value, [
                 generateMessage({
                     kind: 'metric',
                     type: 'start',
                     code: 'requestValidated',
                     data: { timestamp: Date.now() },
                 }),
-            ),
+            ]),
         );
 }
 
@@ -508,14 +508,14 @@ declare module '@gilles-coudert/pure-trace' {
 }
 
 const result = authenticate(credentials).tapSuccess((success) =>
-    success.addTraces(
+    success.addTraces([
         generateMessage({
             kind: 'audit',
             type: 'login',
             code: 'userLoggedIn',
             data: { userId: success.value.id },
         }),
-    ),
+    ]),
 );
 ```
 

@@ -40,7 +40,7 @@ Feature: ResultAsync railway behavior
         Then the resolved result is a failure
         And the resolved result carries the error code "uncaughtException"
 
-    Scenario: a ResultAsync re-executes its computation on every consumption
+    Scenario: a ResultAsync runs its computation at most once across consumptions
         Given an async computation that counts how many times it runs
         When I resolve it twice
-        Then the computation has run 2 times
+        Then the computation has run 1 time

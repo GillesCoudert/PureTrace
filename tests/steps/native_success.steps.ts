@@ -22,11 +22,11 @@ defineFeature(feature, (test) => {
 
         when(/^I tap it with a new trace "(.*)"$/, (arg0) => {
             result = result.tap((value) => {
-                value.addTraces({
+                value.addTraces([{
                     code: arg0,
                     kind: 'Information',
                     type: 'Information',
-                });
+                }]);
             });
         });
 

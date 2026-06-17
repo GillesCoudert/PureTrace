@@ -152,12 +152,11 @@ defineFeature(feature, (test) => {
     });
 
     //>
-    //> Characterization test for analysis point 2: ResultAsync is NOT memoized,
-    //> so each consumption re-runs the underlying computation. This pins the
-    //> CURRENT behavior; if memoization is later introduced, this test should
-    //> go red and be updated deliberately.
+    //> ResultAsync memoizes its computation: resolve() caches the in-flight
+    //> promise, so the underlying computation runs at most once, however many
+    //> times the instance is consumed.
     //>
-    test('a ResultAsync re-executes its computation on every consumption', ({
+    test('a ResultAsync runs its computation at most once across consumptions', ({
         given,
         when,
         then,
@@ -176,7 +175,7 @@ defineFeature(feature, (test) => {
             await resultAsync.resolve();
             await resultAsync.resolve();
         });
-        then(/^the computation has run (\d+) times$/, (count: string) => {
+        then(/^the computation has run (\d+) times?$/, (count: string) => {
             expect(runCount).toBe(Number(count));
         });
     });

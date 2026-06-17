@@ -15,11 +15,11 @@ export type Result<S> = Success<S> | Failure;
 abstract class PureResult<S> {
     /**
      * Constructs a new PureResult instance.
-     * @param trace - An optional PureMessage to associate with the result.
+     * @param traces - Optional PureMessages to associate with the result.
      */
-    constructor(trace?: PureMessage) {
-        if (trace) {
-            this.addTraces(trace);
+    constructor(traces?: readonly PureMessage[]) {
+        if (traces?.length) {
+            this.addTraces(traces);
         }
     }
 
@@ -27,29 +27,35 @@ abstract class PureResult<S> {
     //#region                            TRACE MANAGEMENT                          #
     //#────────────────────────────────────────────────────────────────────────────#
 
-    private readonly traces: PureMessage[] = [];
+    protected readonly traces: PureMessage[] = [];
 
     /**
      * Retrieves the trace messages associated with this result.
-     * @returns A copy of the trace messages.
+     * @returns A shallow copy of the trace messages (messages are immutable).
      */
     public getTraces(): PureMessage[] {
-        return structuredClone(this.traces);
+        return [...this.traces];
     }
 
     /**
      * Adds trace messages to this result.
      * @param traces - The trace messages to add.
-     * @returns The current instance for chaining.
      */
-    public addTraces(...traces: PureMessage[]): this {
+    public addTraces(traces: readonly PureMessage[]): void {
         //>
         //> > fr: Pas de validation runtime : confiance au typage en interne.
         //> > en: No runtime validation: internal callers are trusted via types.
         //>
         this.traces.push(...traces);
-        return this;
     }
+
+    /**
+     * Returns a new result of the same variant carrying this result's own
+     * messages followed by the given ambient traces. Never mutates this instance.
+     * @param ambient - Trace messages to append after this result's own messages.
+     * @returns A new result enriched with the ambient traces.
+     */
+    public abstract cloneWithTraces(ambient: readonly PureMessage[]): Result<S>;
 
     //#────────────────────────────────────────────────────────────────────────────#
     //#endregion                         TRACE MANAGEMENT                          #
@@ -187,7 +193,7 @@ abstract class PureResult<S> {
     //#region    ───── MONADS ─────
 
     public chain<S2>(f: (result: this) => Result<S2>): Result<S2> {
-        return f(this).addTraces(...this.getTraces());
+        return f(this).cloneWithTraces(this.traces);
     }
 
     //#endregion ───── MONADS ─────
@@ -205,13 +211,21 @@ export class Success<S> extends PureResult<S> {
     /**
      * Creates a new Success instance.
      * @param value The successful value.
-     * @param trace Optional trace message.
+     * @param traces Optional trace messages.
      */
     constructor(
         public readonly value: S,
-        trace?: PureMessage,
+        traces?: readonly PureMessage[],
     ) {
-        super(trace);
+        super(traces);
+    }
+
+    /**
+     * Returns a new Success with the same value, this result's own traces,
+     * then the given ambient traces.
+     */
+    public cloneWithTraces(ambient: readonly PureMessage[]): Result<S> {
+        return new Success(this.value, [...this.traces, ...ambient]);
     }
 
     //#────────────────────────────────────────────────────────────────────────────#
@@ -283,7 +297,7 @@ export class Success<S> extends PureResult<S> {
      * @returns A new Result with the mapped value.
      */
     public mapSuccess<S2>(f: (value: S) => Success<S2>): Result<S2> {
-        return f(this.value).addTraces(...this.getTraces());
+        return f(this.value).cloneWithTraces(this.traces);
     }
 
     /**
@@ -313,7 +327,7 @@ export class Success<S> extends PureResult<S> {
     //#region    ───── MONADS ─────
 
     public chainSuccess<S2>(f: (value: S) => Result<S2>): Result<S2> {
-        return f(this.value).addTraces(...this.getTraces());
+        return f(this.value).cloneWithTraces(this.traces);
     }
 
     /**
@@ -363,33 +377,47 @@ export class Failure extends PureResult<never> {
     private readonly errors: PureError[] = [];
     /**
      * Creates a new Failure instance.
-     * @param errors One or more errors associated with the failure.
+     * @param errors The errors associated with the failure.
+     * @param traces Optional trace messages.
      */
-    constructor(...errors: PureError[]) {
-        super();
+    constructor(
+        errors: readonly PureError[] = [],
+        traces?: readonly PureMessage[],
+    ) {
+        super(traces);
         this.addErrors(errors);
+    }
+
+    /**
+     * Returns a new Failure with the same errors, this result's own traces,
+     * then the given ambient traces.
+     */
+    public cloneWithTraces(ambient: readonly PureMessage[]): Failure {
+        return new Failure(this.errors, [...this.traces, ...ambient]);
     }
 
     //#────────────────────────────────────────────────────────────────────────────#
     //#region                            ERROR MANAGEMENT                          #
     //#────────────────────────────────────────────────────────────────────────────#
 
+    /**
+     * Retrieves the errors associated with this failure.
+     * @returns A shallow copy of the errors (errors are immutable).
+     */
     public getErrors(): PureError[] {
-        return structuredClone(this.errors);
+        return [...this.errors];
     }
 
     /**
      * Adds errors to this failure.
      * @param errors The errors to add.
-     * @returns The current instance for chaining.
      */
-    public addErrors(errors: PureError[]): this {
+    public addErrors(errors: readonly PureError[]): void {
         //>
         //> > fr: Pas de validation runtime : confiance au typage en interne.
         //> > en: No runtime validation: internal callers are trusted via types.
         //>
         this.errors.push(...errors);
-        return this;
     }
 
     //#────────────────────────────────────────────────────────────────────────────#
@@ -460,7 +488,7 @@ export class Failure extends PureResult<never> {
     }
 
     public mapFailure(f: (errors: PureMessage[]) => Failure): Result<never> {
-        return f(this.getErrors()).addTraces(...this.getTraces());
+        return f(this.getErrors()).cloneWithTraces(this.traces);
     }
 
     public mapBoth<S2>(
@@ -481,7 +509,7 @@ export class Failure extends PureResult<never> {
     public chainFailure<S2>(
         f: (errors: PureMessage[]) => Result<S2>,
     ): Result<S2> {
-        return f(this.getErrors()).addTraces(...this.getTraces());
+        return f(this.getErrors()).cloneWithTraces(this.traces);
     }
 
     public chainBoth<S2, S3>(
@@ -492,10 +520,7 @@ export class Failure extends PureResult<never> {
     }
 
     public convertFailureToSuccess(defaultValue: never): Success<never> {
-        return new Success(defaultValue).addTraces(
-            ...this.getErrors(),
-            ...this.getTraces(),
-        );
+        return new Success(defaultValue, [...this.errors, ...this.traces]);
     }
 
     //#endregion ───── MONADS ─────
@@ -514,7 +539,7 @@ export class Failure extends PureResult<never> {
 export function generateFailure<T extends NativeErrorType>(
     parameters: PureErrorParameters<T>,
 ): Failure {
-    return new Failure(generateError(parameters));
+    return new Failure([generateError(parameters)]);
 }
 
 /**
@@ -569,7 +594,7 @@ export class GetResult {
                     //> ?! ─────────────────── ?!
                     //> ?! fr: Première erreur ?!
                     //> ?! ─────────────────── ?!
-                    failure = new Failure(...result.getErrors());
+                    failure = new Failure(result.getErrors());
                 } else if (!firstFailureOnly) {
                     failure.addErrors(result.getErrors());
                 }
@@ -582,9 +607,9 @@ export class GetResult {
             }
         }
         if (failure) {
-            return failure.addTraces(...traces);
+            return failure.cloneWithTraces(traces);
         }
-        return new Success(successes).addTraces(...traces);
+        return new Success(successes, traces);
     }
 
     /**
@@ -620,6 +645,6 @@ export class GetResult {
                 successes.push(result.value);
             }
         }
-        return new Success(successes).addTraces(...traces);
+        return new Success(successes, traces);
     }
 }

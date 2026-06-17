@@ -52,14 +52,14 @@ function parseAge(input: string): Result<number> {
 }
 
 const result = parseAge('42').tapSuccess((success) => {
-    success.addTraces(
+    success.addTraces([
         generateMessage({
             kind: 'information',
             type: 'information',
             code: 'ageValidated',
             data: { age: success.value },
         }),
-    );
+    ]);
 });
 
 if (result.isSuccess()) {

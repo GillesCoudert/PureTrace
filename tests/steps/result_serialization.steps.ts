@@ -35,13 +35,13 @@ defineFeature(feature, (test) => {
         given(
             /^a success carrying the value (.*) and the trace "(.*)"$/,
             (value: string, code: string) => {
-                source = new Success<Json>(Number(value)).addTraces(
+                source = new Success<Json>(Number(value), [
                     generateMessage({
                         kind: 'information',
                         type: 'information',
                         code,
                     }),
-                );
+                ]);
             },
         );
 
@@ -79,13 +79,13 @@ defineFeature(feature, (test) => {
                 source = generateFailure({
                     type: 'processError',
                     code: errorCode,
-                }).addTraces(
+                }).cloneWithTraces([
                     generateMessage({
                         kind: 'information',
                         type: 'information',
                         code: traceCode,
                     }),
-                );
+                ]);
             },
         );
 

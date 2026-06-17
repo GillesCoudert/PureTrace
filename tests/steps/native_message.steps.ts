@@ -13,12 +13,12 @@ defineFeature(feature, (test) => {
         when(
             /^I trace a message of kind (.*) and type (.*) with code (.*) and data (.*)$/,
             (arg0, arg1, arg2, arg3) => {
-                success = success.addTraces({
+                success.addTraces([{
                     kind: arg0,
                     type: arg1,
                     code: arg2,
                     data: arg3 === 'undefined' ? undefined : JSON.parse(arg3),
-                });
+                }]);
             },
         );
 

@@ -59,7 +59,7 @@ export function convertZodParseResultToPureResult<TOutput>(
                 }),
             );
         }
-        return new Failure(...errorMessages);
+        return new Failure(errorMessages);
     }
 }
 
@@ -365,19 +365,19 @@ export function serializeResult<S extends Json>(
 export function deserializeResult(input: unknown): Result<Json> {
     const parsed = serializedResultSchema.safeParse(input);
     if (!parsed.success) {
-        return new Failure(
+        return new Failure([
             generateError({
                 type: 'technicalIssue',
                 code: 'invalidResultEnvelope',
                 data: serializeUnknown(parsed.error),
             }),
-        );
+        ]);
     }
     const envelope = parsed.data;
     if (envelope.outcome === 'success') {
-        return new Success<Json>(envelope.value).addTraces(...envelope.traces);
+        return new Success<Json>(envelope.value, envelope.traces);
     }
-    return new Failure(...envelope.errors).addTraces(...envelope.traces);
+    return new Failure(envelope.errors, envelope.traces);
 }
 
 //#────────────────────────────────────────────────────────────────────────────#
