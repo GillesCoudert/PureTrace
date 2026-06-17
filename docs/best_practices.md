@@ -42,7 +42,8 @@ Best Practices
 ## Tracing & observability
 
 - Add business or technical traces with `addTraces` or `tap` for observability.
-- Use native helpers (`generateMessage`, `generateError`, `generateFailure`) to ensure structure and localizability of messages.
+- Use native helpers (`generateMessage`, `generateError`, `generateFailure`) for type-safe, localizable message construction. They do **not** validate at runtime — they rely on the types; validate untrusted input at the boundary with `pureZodParse`.
+- Need a custom message kind? Extend the `MessageRegistry` interface via module augmentation — the generators become strict on it at compile time.
 
 ---
 

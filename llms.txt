@@ -75,7 +75,7 @@ console.log(failure.getErrors().length); // 2
 
 ### PureMessage and PureError
 
-`PureMessage` is a structured, Zod-validated message with these fields:
+`PureMessage` is a structured message with these fields:
 - `kind`: category (`'error'`, `'information'`, `'metric'`)
 - `type`: subcategory within the kind
 - `code`: machine-readable identifier (your domain-specific error code)
@@ -84,6 +84,8 @@ console.log(failure.getErrors().length); // 2
 - `localizedMessage`: optional `{ locale, message }` for user-facing text
 
 `PureError` is a `PureMessage` with `kind: 'error'`. It is the only type that goes into a `Failure`.
+
+The message shape is defined by a Zod schema, which is also the source of the `PureMessage` and `PureError` TypeScript types. Messages are trusted by their types and are **not** re-validated at runtime when created or attached to a `Result` — runtime validation happens only at boundaries, where external input is parsed via `pureZodParse`.
 
 **Native error types** (the `type` field for errors):
 - `'processError'` — business/domain errors (validation failures, rule violations)
@@ -108,6 +110,26 @@ const failure = generateFailure({
     code: 'userNotFound',
 });
 ```
+
+### Extending the message taxonomy
+
+The native kinds (`'error'`, `'information'`, `'metric'`) and their types are the **default** set — proposed, not imposed. The kinds, their types, and the `data` shape each carries are described by the augmentable `MessageRegistry` interface. Add your own kind through module augmentation; the generators (`generateMessage`, `generateError`) then become strict on it at compile time:
+
+```typescript
+declare module '@gilles-coudert/pure-trace' {
+    interface MessageRegistry {
+        audit: {
+            login: { userId: string };
+            logout: { userId: string };
+        };
+    }
+}
+
+// Now type-checked against the custom kind:
+generateMessage({ kind: 'audit', type: 'login', code: 'ok', data: { userId: '1' } });
+```
+
+This is a **compile-time** constraint only. A raw `PureMessage` keeps an open `kind: string`, so messages flow freely across layers and nothing is validated at runtime. Each layer (or the leaf application) augments the same global `MessageRegistry`; the declarations merge.
 
 ### Traces
 
@@ -186,6 +208,23 @@ Standard Zod issues are aggregated into a single `processError` with code `'zodP
 - `GetResult.fromThrowable(fn, onError)` — wraps a throwing function into a `Result`
 - `GetResult.fromResultArray(results, firstFailureOnly?)` — aggregates `Result<X>[]` into `Result<X[]>`
 - `GetResult.fromResultArrayAsSuccess(results)` — always returns `Success<X[]>`, moving errors to traces
+
+### Serializing results across a boundary
+
+In a distributed system, a `Result` may be serialized and exchanged between processes (queues, RPC, event stores). Two functions handle the round-trip:
+
+- `serializeResult(result)` produces a JSON-safe envelope `{ outcome, value | errors, traces }`. The success value must already be `Json`.
+- `deserializeResult(input)` rebuilds a `Result<Json>` from an untrusted envelope.
+
+`deserializeResult` validates the envelope **structure** (well-formed messages), not the taxonomy: an unregistered `kind` is accepted, since a peer may use kinds you do not know (be liberal in what you accept). A malformed envelope becomes a `Failure` with code `invalidResultEnvelope` instead of throwing. This is the one place runtime validation happens, by design — at the wire boundary, never on the hot path.
+
+```typescript
+import { serializeResult, deserializeResult } from '@gilles-coudert/pure-trace';
+
+const wire = JSON.stringify(serializeResult(result));
+// ... over the network ...
+const restored = deserializeResult(JSON.parse(wire)); // Result<Json>
+```
 
 ## Patterns
 
@@ -306,8 +345,11 @@ return `ResultAsync`. All CRUD errors flow through the `Result` pipeline.
 | `generateError(params)` | Creates a `PureError` from typed parameters |
 | `generateFailure(params)` | Creates a `Failure` from typed parameters (shorthand) |
 | `generateMessage(params)` | Creates a `PureMessage` (for traces, metrics, info) |
+| `MessageRegistry` | Augmentable interface (kind → type → `data`); extend it via `declare module` to add custom kinds |
 | `pureZodParse(data, schema)` | Validates data against a Zod schema, returns `Result` |
 | `convertZodParseResultToPureResult(zodResult)` | Converts a Zod `SafeParseResult` to `Result` |
 | `GetResult.fromThrowable(fn, onError)` | Wraps a throwing function into `Result` |
 | `GetResult.fromResultArray(results, firstFailureOnly?)` | Aggregates `Result[]` into `Result<T[]>` (stops at first failure by default) |
 | `GetResult.fromResultArrayAsSuccess(results)` | Always `Success`, errors become traces |
+| `serializeResult(result)` | Serializes a `Result` into a JSON-safe envelope |
+| `deserializeResult(input)` | Rebuilds a `Result` from an untrusted envelope (structural validation) |

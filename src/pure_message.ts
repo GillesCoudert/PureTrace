@@ -125,42 +125,89 @@ export type ZodAnyJsonObject = ZodJsonObject<z.core.$loose>;
 //#────────────────────────────────────────────────────────────────────────────#
 
 //#────────────────────────────────────────────────────────────────────────────#
-//#region                              NATIVE ERRORS                           #
+//#region                         MESSAGE REGISTRY                            #
 //#────────────────────────────────────────────────────────────────────────────#
 
-//#region    ───── TYPES ─────
-
-type NativeErrorDefinitions = {
-    readonly pureTraceInternalError: z.ZodObject<
-        {
-            pureMessage: z.ZodObject<z.core.$ZodLooseShape, z.core.$loose>;
-            zodError: z.ZodObject<z.core.$ZodLooseShape, z.core.$loose>;
-        },
-        z.core.$strip
-    >;
-    readonly technicalIssue: z.ZodUnion<[z.ZodJSONSchema, z.ZodUndefined]>;
-    readonly processError: z.ZodUnion<[z.ZodJSONSchema, z.ZodUndefined]>;
-};
+//>
+//> > fr: Registre augmentable kind -> type -> forme du `data`. Les kinds natifs sont pre-enregistres ; les consommateurs ajoutent les leurs par module augmentation.
+//> > en: Augmentable registry kind -> type -> `data` shape. Native kinds are pre-registered; consumers add their own through module augmentation.
+//>
 
 /**
- * The set of all native PureError type keys.
+ * Augmentable registry mapping each message `kind` to its allowed `type`s and
+ * the shape of the `data` each carries.
+ *
+ * The native kinds (`error`, `information`, `metric`) are pre-registered.
+ * Adding a custom kind is done through module augmentation — the single
+ * extension point. It constrains the message generators at compile time only:
+ * a raw {@link PureMessage} keeps an open `kind: string`, and nothing is
+ * validated at runtime (see {@link messageSchema}).
+ *
+ * @example
+ * ```typescript
+ * declare module '@gilles-coudert/pure-trace' {
+ *     interface MessageRegistry {
+ *         audit: {
+ *             login: { userId: string };
+ *             logout: { userId: string };
+ *         };
+ *     }
+ * }
+ *
+ * generateMessage({ kind: 'audit', type: 'login', code: 'ok', data: { userId: '1' } });
+ * ```
  */
-export type NativeErrorType = keyof NativeErrorDefinitions;
+export interface MessageRegistry {
+    error: {
+        processError: Json | undefined;
+        technicalIssue: Json | undefined;
+        pureTraceInternalError: Json | undefined;
+    };
+    information: {
+        warning: Json | undefined;
+        information: Json | undefined;
+    };
+    metric: {
+        start: string;
+        stop: string;
+    };
+}
 
 /**
- * The data type associated with a given native PureError type.
+ * All registered message kinds (native kinds plus any added by augmentation).
  */
-export type NativeErrorData<T extends NativeErrorType> = z.infer<
-    NativeErrorDefinitions[T]
->;
+export type MessageKind = keyof MessageRegistry;
 
-//#endregion ───── TYPES ─────
+/**
+ * The registered `type`s available for a given message kind.
+ */
+export type MessageType<K extends MessageKind> = keyof MessageRegistry[K] &
+    string;
 
-//#region    ───── GENERATOR ─────
+/**
+ * The `data` shape carried by a given kind/type pair.
+ */
+export type MessageData<
+    K extends MessageKind,
+    T extends MessageType<K>,
+> = MessageRegistry[K][T];
+
+//#region    ───── ERRORS ─────
+
+/**
+ * The registered error `type`s — the `type` field of a `kind: 'error'` message.
+ */
+export type NativeErrorType = MessageType<'error'>;
+
+/**
+ * The `data` shape associated with a given error type.
+ */
+export type NativeErrorData<T extends NativeErrorType> =
+    MessageRegistry['error'][T];
 
 /**
  * Parameters for generating a PureError.
- * @template T The native PureError type.
+ * @template T The error type.
  */
 export type PureErrorParameters<T extends NativeErrorType> = {
     type: T;
@@ -171,10 +218,18 @@ export type PureErrorParameters<T extends NativeErrorType> = {
 };
 
 /**
- * Generates a strongly-typed PureError message object.
- * @template T The native PureError type.
+ * Generates a strongly-typed PureError (a message with `kind: 'error'`).
+ * @template T The error type.
  * @param parameters PureError details and metadata.
- * @returns A validated PureError object.
+ * @returns A PureError object.
+ * @example
+ * ```typescript
+ * const error = generateError({
+ *     type: 'processError',
+ *     code: 'userNotFound',
+ *     data: { userId: '42' },
+ * });
+ * ```
  */
 export function generateError<T extends NativeErrorType>(
     parameters: PureErrorParameters<T>,
@@ -185,76 +240,54 @@ export function generateError<T extends NativeErrorType>(
     } as PureError;
 }
 
-//#endregion ───── GENERATOR ─────
+//#endregion ───── ERRORS ─────
 
-//#────────────────────────────────────────────────────────────────────────────#
-//#endregion                           NATIVE ERRORS                           #
-//#────────────────────────────────────────────────────────────────────────────#
-
-//#────────────────────────────────────────────────────────────────────────────#
-//#region                             NATIVE MESSAGES                          #
-//#────────────────────────────────────────────────────────────────────────────#
-
-//#region    ───── TYPES ─────
-
-type NativeMessageDefinitions = {
-    pureError: NativeErrorDefinitions;
-    information: {
-        warning: z.ZodJSONSchema;
-        information: z.ZodJSONSchema;
-    };
-    metric: {
-        start: z.ZodISODateTime;
-        stop: z.ZodISODateTime;
-    };
-};
-type NativeMessageKind = keyof NativeMessageDefinitions;
-type NativeMessageType<K extends NativeMessageKind> =
-    keyof NativeMessageDefinitions[K];
-type NativeMessageData<
-    K extends NativeMessageKind,
-    T extends NativeMessageType<K>,
-> = NativeMessageDefinitions[K][T];
-
-//#endregion ───── TYPES ─────
-
-//#region    ───── GENERATOR ─────
+//#region    ───── MESSAGES ─────
 
 /**
  * Parameters for generating a PureMessage.
- * @template K The PureMessage kind.
- * @template T The PureMessage type.
+ * @template K The message kind.
+ * @template T The message type.
  */
 export type GenerateMessageParameters<
-    K extends NativeMessageKind,
-    T extends NativeMessageType<K>,
+    K extends MessageKind,
+    T extends MessageType<K>,
 > = {
     kind: K;
     type: T;
     code: string;
-    data?: NativeMessageData<K, T>;
+    data?: MessageData<K, T>;
     issuer?: string;
     localizedMessage?: LocalizedMessage;
 };
 
 /**
- * Generates a strongly-typed PureMessage object.
- * @template K The PureMessage kind.
- * @template T The PureMessage type.
+ * Generates a strongly-typed PureMessage (for traces, metrics, information).
+ * @template K The message kind.
+ * @template T The message type.
  * @param parameters PureMessage details and metadata.
- * @returns A validated PureMessage object.
+ * @returns A PureMessage object.
+ * @example
+ * ```typescript
+ * const trace = generateMessage({
+ *     kind: 'metric',
+ *     type: 'start',
+ *     code: 'fetchUser',
+ *     data: new Date().toISOString(),
+ * });
+ * ```
  */
 export function generateMessage<
-    K extends NativeMessageKind,
-    T extends NativeMessageType<K>,
+    K extends MessageKind,
+    T extends MessageType<K>,
 >(parameters: GenerateMessageParameters<K, T>): PureMessage {
     return {
         ...parameters,
     } as PureMessage;
 }
 
-//#endregion ───── GENERATOR ─────
+//#endregion ───── MESSAGES ─────
 
 //#────────────────────────────────────────────────────────────────────────────#
-//#endregion                          NATIVE MESSAGES                          #
+//#endregion                      MESSAGE REGISTRY                            #
 //#────────────────────────────────────────────────────────────────────────────#

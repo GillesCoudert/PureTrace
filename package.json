@@ -10,7 +10,8 @@
     "types": "lib/index.d.ts",
     "files": [
         "lib",
-        "docs"
+        "docs",
+        "llms.txt"
     ],
     "scripts": {
         "prebuild": "node -e \"require('fs').rmSync('lib', { recursive: true, force: true })\"",

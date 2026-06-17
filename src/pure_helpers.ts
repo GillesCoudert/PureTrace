@@ -1,6 +1,14 @@
 import z from 'zod';
 import { Failure, Result, Success } from './pure_result';
-import { Json, JsonObject, PureError, generateError } from './pure_message';
+import {
+    Json,
+    JsonObject,
+    PureError,
+    PureMessage,
+    errorSchema,
+    generateError,
+    messageSchema,
+} from './pure_message';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function pureZodParse<T extends z.ZodObject<any>>(
@@ -282,4 +290,96 @@ function serializePlainObject(
 
 //#────────────────────────────────────────────────────────────────────────────#
 //#endregion                    UNKNOWN VALUE SERIALIZATION                    #
+//#────────────────────────────────────────────────────────────────────────────#
+//#────────────────────────────────────────────────────────────────────────────#
+//#region                        RESULT SERIALIZATION                          #
+//#────────────────────────────────────────────────────────────────────────────#
+
+//>
+//> > fr: Frontiere distribuee : (de)serialisation d'un Result avec controle structurel.
+//> > en: Distributed boundary: (de)serialization of a Result with structural control.
+//>
+
+/**
+ * JSON-safe wire format of a {@link Result}, suitable for transport between
+ * processes (queues, RPC, event stores).
+ */
+export type SerializedResult =
+    | { outcome: 'success'; value: Json; traces: PureMessage[] }
+    | { outcome: 'failure'; errors: PureError[]; traces: PureMessage[] };
+
+const serializedResultSchema = z.discriminatedUnion('outcome', [
+    z.object({
+        outcome: z.literal('success'),
+        value: z.json(),
+        traces: z.array(messageSchema),
+    }),
+    z.object({
+        outcome: z.literal('failure'),
+        errors: z.array(errorSchema),
+        traces: z.array(messageSchema),
+    }),
+]);
+
+/**
+ * Serializes a Result into a JSON-safe envelope.
+ *
+ * The success value must already be JSON-serializable (`Json`). The returned
+ * object can be passed to `JSON.stringify` as-is.
+ *
+ * @example
+ * ```typescript
+ * const wire = JSON.stringify(serializeResult(new Success({ id: 1 })));
+ * ```
+ */
+export function serializeResult<S extends Json>(
+    result: Result<S>,
+): SerializedResult {
+    if (result.isSuccess()) {
+        return {
+            outcome: 'success',
+            value: result.value,
+            traces: result.getTraces(),
+        };
+    }
+    return {
+        outcome: 'failure',
+        errors: result.getErrors(),
+        traces: result.getTraces(),
+    };
+}
+
+/**
+ * Reconstructs a Result from an untrusted serialized envelope.
+ *
+ * Validates the envelope *structure* (outcome, well-formed messages), not the
+ * taxonomy: an unregistered `kind` is accepted on purpose, since a peer service
+ * may use kinds this one does not know. A malformed envelope yields a `Failure`
+ * with code `invalidResultEnvelope` rather than throwing.
+ *
+ * @example
+ * ```typescript
+ * const restored = deserializeResult(JSON.parse(wire));
+ * ```
+ */
+export function deserializeResult(input: unknown): Result<Json> {
+    const parsed = serializedResultSchema.safeParse(input);
+    if (!parsed.success) {
+        return new Failure(
+            generateError({
+                type: 'technicalIssue',
+                code: 'invalidResultEnvelope',
+                data: serializeUnknown(parsed.error),
+            }),
+        );
+    }
+    const envelope = parsed.data;
+    if (envelope.outcome === 'success') {
+        return new Success<Json>(envelope.value).addTraces(...envelope.traces);
+    }
+    return new Failure(...envelope.errors).addTraces(...envelope.traces);
+}
+
+//#────────────────────────────────────────────────────────────────────────────#
+//#endregion                      RESULT SERIALIZATION                         #
 //#────────────────────────────────────────────────────────────────────────────#

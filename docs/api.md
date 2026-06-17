@@ -13,7 +13,9 @@ It focuses on types, responsibilities, and composition rules.
 - [PureMessage](#puremessage)
 - [Native pure message helpers](#native-pure-message-helpers)
 - [Native pure message kinds](#native-pure-message-kinds)
+- [Extending the taxonomy](#extending-the-taxonomy)
 - [Zod integration helpers](#zod-integration-helpers)
+- [Result serialization](#result-serialization)
 
 ## Result&lt;S&gt;
 
@@ -122,8 +124,10 @@ addTraces(...traces: PureMessage[]): this
 ```
 
 ```ts
-addErrors(...errors: PureError[]): this // Failure only
+addErrors(errors: PureError[]): this // Failure only
 ```
+
+Both `addTraces` and `addErrors` append the given messages as-is and perform **no runtime validation**: callers are trusted through the types. Validate untrusted or external input at the boundary with `pureZodParse` instead.
 
 ## Success&lt;S&gt;
 
@@ -247,7 +251,7 @@ type PureMessage = {
     kind: string;
     type: string;
     code: string;
-    data?: unknown;
+    data?: Json;
     issuer?: string;
     localizedMessage?: LocalizedMessage;
 };
@@ -270,7 +274,7 @@ generateMessage<K, T>(options: {
   kind: K;
   type: T;
   code: string;
-  data?: NativeMessageData<K, T>;
+  data?: MessageData<K, T>;
   issuer?: string;
   localizedMessage?: LocalizedMessage;
 }): PureMessage
@@ -297,18 +301,20 @@ Intended for advanced use cases where errors are assembled manually.
 Creates a Failure containing a native PureError.
 
 ```ts
-generateFailure<T>(
-  type: NativeErrorType,
-  code: string,
-  data?: NativeErrorData<T>,
-  issuer?: string,
-  localizedMessage?: LocalizedMessage,
-): Failure
+generateFailure<T extends NativeErrorType>(parameters: {
+  type: T;
+  code: string;
+  data?: NativeErrorData<T>;
+  issuer?: string;
+  localizedMessage?: LocalizedMessage;
+}): Failure
 ```
 
 Preferred way to create Failures when using native PureError types.
 
 ## Native pure message kinds
+
+These are the **default** kinds and types, described by the augmentable `MessageRegistry` interface (see [Extending the taxonomy](#extending-the-taxonomy)). They are proposed, not imposed.
 
 ### PureErrors (`kind: 'error'`)
 
@@ -325,6 +331,38 @@ Preferred way to create Failures when using native PureError types.
 
 - `start`
 - `stop`
+
+## Extending the taxonomy
+
+The set of kinds, their types, and the `data` each carries is described by the augmentable `MessageRegistry` interface:
+
+```ts
+interface MessageRegistry {
+    error: {
+        processError: Json | undefined;
+        technicalIssue: Json | undefined;
+        pureTraceInternalError: Json | undefined;
+    };
+    information: { warning: Json | undefined; information: Json | undefined };
+    metric: { start: string; stop: string };
+}
+
+type MessageKind = keyof MessageRegistry;
+type MessageType<K extends MessageKind> = keyof MessageRegistry[K] & string;
+type MessageData<K extends MessageKind, T extends MessageType<K>> = MessageRegistry[K][T];
+```
+
+Add a custom kind through module augmentation; `generateMessage` / `generateError` then become strict on it at compile time:
+
+```ts
+declare module '@gilles-coudert/pure-trace' {
+    interface MessageRegistry {
+        audit: { login: { userId: string }; logout: { userId: string } };
+    }
+}
+```
+
+This is a compile-time constraint only — a raw `PureMessage` keeps `kind: string`, and nothing is validated at runtime.
 
 ## Zod integration helpers
 
@@ -415,6 +453,32 @@ if (result.isSuccess()) {
     // traces contain validation success information
 }
 ```
+
+## Result serialization
+
+For distributed systems that exchange serialized results between processes (queues, RPC, event stores).
+
+### serializeResult
+
+```ts
+serializeResult<S extends Json>(result: Result<S>): SerializedResult
+```
+
+Produces a JSON-safe envelope. The success value must already be `Json`.
+
+```ts
+type SerializedResult =
+  | { outcome: 'success'; value: Json; traces: PureMessage[] }
+  | { outcome: 'failure'; errors: PureError[]; traces: PureMessage[] };
+```
+
+### deserializeResult
+
+```ts
+deserializeResult(input: unknown): Result<Json>
+```
+
+Rebuilds a Result from an untrusted envelope. Validates the envelope **structure** (well-formed messages), **not** the taxonomy — an unregistered `kind` is accepted on purpose. A malformed envelope yields a `Failure` with code `invalidResultEnvelope`; it never throws.
 
 ## Design notes
 

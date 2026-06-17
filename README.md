@@ -16,6 +16,7 @@ Use PureTrace if you want:
 - **i18n-ready errors** (codes + structured data)
 - **One mental model** for sync and async flows
 - **Seamless Zod integration** for schema validation
+- **Extensible message taxonomy** — add your own kinds with compile-time safety via module augmentation
 
 PureTrace is designed for applications where errors are part of the domain, not just technical failures.
 

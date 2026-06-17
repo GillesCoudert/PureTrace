@@ -341,7 +341,7 @@ function registerUser(
 ): Result<{ username: string; email: string; age: number }> {
     return pureZodParse(data, registrationSchema).mapFailure((errors) =>
         new Failure(...errors).addTraces(
-            generatePureMessage({
+            generateMessage({
                 kind: 'information',
                 type: 'warning',
                 code: 'registrationValidationFailed',
@@ -419,7 +419,7 @@ const result = validateRegistration({
 }).tap((r) => {
     if (r.isFailure()) {
         r.addTraces(
-            generatePureMessage({
+            generateMessage({
                 kind: 'information',
                 type: 'warning',
                 code: 'registrationFailed',
@@ -474,7 +474,7 @@ function handleApiRequest(
         })
         .mapSuccess((value) =>
             new Success(value).addTraces(
-                generatePureMessage({
+                generateMessage({
                     kind: 'metric',
                     type: 'start',
                     code: 'requestValidated',
@@ -491,6 +491,35 @@ if (result.isFailure()) {
     // All PureErrors have code 'invalidRequest' with original error details in data
 }
 ```
+
+---
+
+## Extending the taxonomy with a custom kind
+
+```ts
+// Declared once for the whole project (e.g. in a shared `trace.ts` module):
+declare module '@gilles-coudert/pure-trace' {
+    interface MessageRegistry {
+        audit: {
+            login: { userId: string };
+            logout: { userId: string };
+        };
+    }
+}
+
+const result = authenticate(credentials).tapSuccess((success) =>
+    success.addTraces(
+        generateMessage({
+            kind: 'audit',
+            type: 'login',
+            code: 'userLoggedIn',
+            data: { userId: success.value.id },
+        }),
+    ),
+);
+```
+
+`generateMessage` is now type-checked against the `audit` kind: an unknown kind, an unknown type, or a wrong `data` shape is a compile error. The constraint is compile-time only — nothing is validated at runtime.
 
 ---
 

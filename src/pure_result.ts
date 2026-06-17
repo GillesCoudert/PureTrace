@@ -1,9 +1,7 @@
-import z from 'zod';
 import {
     PureError,
     generateError,
     PureMessage,
-    messageSchema,
     NativeErrorType,
     PureErrorParameters,
 } from './pure_message';
@@ -45,20 +43,11 @@ abstract class PureResult<S> {
      * @returns The current instance for chaining.
      */
     public addTraces(...traces: PureMessage[]): this {
-        for (let trace of traces) {
-            const zodParseResult = messageSchema.safeParse(trace);
-            if (!zodParseResult.success) {
-                trace = generateError({
-                    type: 'pureTraceInternalError',
-                    code: 'invalidTraceMessage',
-                    data: {
-                        pureMessage: trace,
-                        zodError: z.treeifyError(zodParseResult.error),
-                    },
-                });
-            }
-            this.traces.push(trace);
-        }
+        //>
+        //> > fr: Pas de validation runtime : confiance au typage en interne.
+        //> > en: No runtime validation: internal callers are trusted via types.
+        //>
+        this.traces.push(...traces);
         return this;
     }
 
@@ -395,20 +384,11 @@ export class Failure extends PureResult<never> {
      * @returns The current instance for chaining.
      */
     public addErrors(errors: PureError[]): this {
-        for (let error of errors) {
-            const zodParseResult = messageSchema.safeParse(error);
-            if (!zodParseResult.success) {
-                error = generateError({
-                    type: 'pureTraceInternalError',
-                    code: 'invalidError',
-                    data: {
-                        pureMessage: error,
-                        zodError: z.treeifyError(zodParseResult.error),
-                    },
-                });
-            }
-            this.errors.push(error);
-        }
+        //>
+        //> > fr: Pas de validation runtime : confiance au typage en interne.
+        //> > en: No runtime validation: internal callers are trusted via types.
+        //>
+        this.errors.push(...errors);
         return this;
     }
 
