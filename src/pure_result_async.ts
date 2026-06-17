@@ -119,11 +119,25 @@ export interface ResultAsync<S> extends PromiseLike<Result<S>> {
 }
 
 class ResultAsyncImpl<S> implements ResultAsync<S> {
+    private memoized?: Promise<Result<S>>;
+
     constructor(
         private compute: (helpers: ResultAsyncHelpers) => ResultAsyncValue<S>,
     ) {}
 
-    async resolve(): Promise<Result<S>> {
+    /**
+     * Resolves the underlying computation to a `Result`. Idempotent: the
+     * computation runs at most once, however many times the instance is consumed.
+     */
+    resolve(): Promise<Result<S>> {
+        // >
+        // > Cache the in-flight promise (not the resolved value) so concurrent or
+        // > repeated consumption shares a single execution.
+        // >
+        return (this.memoized ??= this.computeOnce());
+    }
+
+    private async computeOnce(): Promise<Result<S>> {
         try {
             return await this.compute(resultAsyncHelpers);
         } catch (e) {

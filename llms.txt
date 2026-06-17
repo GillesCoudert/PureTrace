@@ -154,12 +154,17 @@ You do not need to manually forward them.
 
 `ResultAsync<S>` wraps an asynchronous `Result` computation with the same combinators
 as `Result` (tap, map, chain), but operating on `Promise<Result<S>>` under the hood.
-It implements `PromiseLike<Result<S>>`, so you can `await` it directly.
+
+It is a **lazy, single-run pipeline**: the computation does not start until it is resolved,
+and resolution happens **exactly once** (the result is memoized). You build a `ResultAsync`
+by composing combinators and you **return** it — you do not resolve or `await` it in your own
+code. Resolution is a boundary concern, performed once by the framework edge (e.g. a
+PureArchitecture controller). Keep the whole pipeline in `Result`/`ResultAsync` form end to end.
 
 ```typescript
 import { ResultAsync, Success, Failure } from '@gilles-coudert/pure-trace';
 
-// From a deferred computation
+// From a deferred computation — async work lives INSIDE the compute callback
 const fetchUser = ResultAsync<User>(async ({ liftSuccess, liftFailure }) => {
     const response = await fetch('/api/users/1');
     if (!response.ok) {
@@ -174,9 +179,21 @@ const fromPromise = ResultAsync.fromPromise(
     (error) => new Failure(generateError({ type: 'technicalIssue', code: 'fetchFailed' })),
 );
 
-// Resolving
-const result = await fetchUser.resolve(); // Result<User>
-// or simply: const result = await fetchUser; // also Result<User>
+// Consuming: compose and RETURN. You stay in ResultAsync — no await here.
+function loadUserProfile(id: string): ResultAsync<Profile> {
+    return ResultAsync.liftSuccess(id)
+        .chainSuccess((userId) => fetchUserById(userId))
+        .mapSuccess((user) => new Success(toProfile(user)));
+}
+```
+
+Only the framework boundary collapses a `ResultAsync` into a `Result`, once, via
+`.resolve()`. This is the single place an `await` is appropriate, and it is owned by the
+framework — not by domain or application code:
+
+```typescript
+// Framework edge ONLY (e.g. inside a controller). Do not write this in your use cases.
+const result: Result<Profile> = await loadUserProfile(id).resolve();
 ```
 
 **Static factory methods on `ResultAsync`:**
@@ -246,11 +263,15 @@ const result = validateInput(rawData)
 
 ### Async chaining
 
+Compose the whole async flow and return it. The pipeline stays lazy and is resolved
+once, later, at the framework boundary — your code never awaits it.
+
 ```typescript
-const result = await ResultAsync.liftSuccess(userId)
-    .chainSuccess((id) => fetchUser(id))          // returns PromiseLike<Result<User>>
-    .chainSuccess((user) => fetchOrders(user.id))  // returns PromiseLike<Result<Order[]>>
-    .resolve();
+function loadUserOrders(userId: string): ResultAsync<Order[]> {
+    return ResultAsync.liftSuccess(userId)
+        .chainSuccess((id) => fetchUser(id))           // returns PromiseLike<Result<User>>
+        .chainSuccess((user) => fetchOrders(user.id)); // returns PromiseLike<Result<Order[]>>
+}
 ```
 
 ### Side effects with tap
@@ -316,6 +337,32 @@ Traces are not decorative. They carry observability data across the call stack.
 Do not create new `Success`/`Failure` instances to discard traces when chaining manually.
 Use the built-in combinators (`chainSuccess`, `mapSuccess`, etc.) which propagate traces automatically.
 
+### Awaiting or resolving a ResultAsync in your own code
+
+A `ResultAsync` is a lazy pipeline meant to be composed and returned, then resolved
+**once** at the framework boundary. Awaiting or `.resolve()`-ing it inside domain or
+application code breaks the pipeline: you unwrap to a `Result` too early, lose the
+ability to keep chaining async steps, and scatter resolution points the framework can
+no longer own.
+
+```typescript
+// WRONG — unwraps mid-pipeline, in code that should just compose and return
+async function loadUserOrders(userId: string): Promise<Result<Order[]>> {
+    const user = await fetchUser(userId);            // do not await
+    if (user.isFailure()) return user;
+    return await fetchOrders(user.value.id).resolve(); // do not resolve here
+}
+
+// CORRECT — stay in ResultAsync, compose, return
+function loadUserOrders(userId: string): ResultAsync<Order[]> {
+    return fetchUser(userId)
+        .chainSuccess((user) => fetchOrders(user.id));
+}
+```
+
+(Resolution is idempotent — a `ResultAsync` runs at most once even if resolved
+repeatedly — but that is a safety net, not an invitation to resolve in consumer code.)
+
 ### Using generateFailure with type 'pureTraceInternalError'
 
 This type is reserved for the framework's internal validation. Use `'processError'` for domain
@@ -339,7 +386,7 @@ return `ResultAsync`. All CRUD errors flow through the `Result` pipeline.
 | `Result<S>` | Union type: `Success<S> \| Failure` |
 | `Success<S>` | Wraps a successful value with traces |
 | `Failure` | Wraps one or more `PureError` with traces |
-| `ResultAsync<S>` | Async `Result` with chainable combinators, implements `PromiseLike` |
+| `ResultAsync<S>` | Lazy, single-run async `Result` pipeline; compose and return, resolved once at the boundary |
 | `PureMessage` | Structured message (kind, type, code, data, issuer, localizedMessage) |
 | `PureError` | `PureMessage` with `kind: 'error'` |
 | `generateError(params)` | Creates a `PureError` from typed parameters |
