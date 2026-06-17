@@ -58,7 +58,5 @@
     "peerDependencies": {
         "zod": "^4.0.0"
     },
-    "dependencies": {
-        "serialize-error": "^13.0.1"
-    }
+    "dependencies": {}
 }
