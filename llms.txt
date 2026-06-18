@@ -217,8 +217,9 @@ const result = pureZodParse(unknownData, userSchema);
 // Result<{ name: string; age: number }>
 ```
 
-Custom Zod issues (with `code: 'custom'`) are converted to individual `PureError` entries.
-Standard Zod issues are aggregated into a single `processError` with code `'zodParseFailed'`.
+Each Zod issue maps to one structured `PureError` of type `processError`.
+Custom issues (`code: 'custom'`) use their `message` as the PureError `code` and `params` as `data`.
+Standard issues use the Zod issue `code` (e.g. `'invalid_type'`, `'too_small'`, `'invalid_format'`) as the PureError `code`; `data` keeps the issue context (`path`, `message`, `expected`, `minimum`, `format`…) but never the rejected `input`.
 
 ### GetResult — Utility class
 

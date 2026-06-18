@@ -356,8 +356,8 @@ const result = registerUser({ username: 'ab', email: 'bad', age: 15 });
 
 if (result.isFailure()) {
     const errors = result.getErrors();
-    // PureError codes include: 'userTooYoung', 'zodParseFailed'
-    // Generic validation errors are aggregated as PureError
+    // PureError codes include: 'too_small' (username), 'invalid_format' (email), 'userTooYoung' (age, custom)
+    // Each Zod issue maps to its own structured PureError
 }
 ```
 

@@ -39,7 +39,7 @@ defineFeature(feature, (test) => {
         });
     });
 
-    test('Failed Zod parsing with invalid data - generic errors', ({
+    test('Failed Zod parsing maps each standard issue to a structured error', ({
         given,
         when,
         then,
@@ -65,33 +65,38 @@ defineFeature(feature, (test) => {
             expect(result.isFailure()).toBe(true);
         });
 
-        and(
-            /^the failure contains a single error with code "(.*)"$/,
-            (errorCode: string) => {
-                if (result.isFailure()) {
-                    const errors = result.getErrors();
-                    expect(errors).toHaveLength(1);
-                    expect(errors[0].code).toBe(errorCode);
-                }
-            },
-        );
+        and(/^the failure contains (\d+) errors$/, (count: string) => {
+            expect(getErrors(result)).toHaveLength(parseInt(count, 10));
+        });
 
-        and(
-            /^the error data contains a count of (.*)$/,
-            (errorCount: string) => {
-                if (result.isFailure()) {
-                    const errors = result.getErrors();
-                    const count = parseInt(
-                        (errors[0].data as Record<string, unknown>)
-                            ?.count as string,
-                        10,
-                    );
-                    expect(count).toBeGreaterThanOrEqual(
-                        parseInt(errorCount, 10),
-                    );
-                }
-            },
-        );
+        and(/^every error has type "(.*)"$/, (errorType: string) => {
+            for (const error of getErrors(result)) {
+                expect(error.type).toBe(errorType);
+            }
+        });
+
+        and(/^every error has code "(.*)"$/, (errorCode: string) => {
+            for (const error of getErrors(result)) {
+                expect(error.code).toBe(errorCode);
+            }
+        });
+
+        and('every error data has a non-empty path', () => {
+            for (const error of getErrors(result)) {
+                const data = error.data as { path?: unknown };
+                expect(Array.isArray(data.path)).toBe(true);
+                expect((data.path as unknown[]).length).toBeGreaterThan(0);
+            }
+        });
+
+        and('no error leaks the raw input or a stack trace', () => {
+            for (const error of getErrors(result)) {
+                const data = error.data as Record<string, unknown>;
+                expect(data).not.toHaveProperty('input');
+                expect(data).not.toHaveProperty('stack');
+                expect(data).not.toHaveProperty('zodError');
+            }
+        });
     });
 
     test('Failed Zod parsing with custom validation errors', ({
@@ -122,20 +127,16 @@ defineFeature(feature, (test) => {
         and(
             /^the failure contains an error with code (.*)$/,
             (errorCode: string) => {
-                if (result.isFailure()) {
-                    const errors = result.getErrors();
-                    const codes = errors.map((e) => e.code);
-                    expect(codes).toContain(errorCode);
-                }
+                const codes = getErrors(result).map((e) => e.code);
+                expect(codes).toContain(errorCode);
             },
         );
 
         and(/^the error has type "(.*)"$/, (errorType: string) => {
-            if (result.isFailure()) {
-                const errors = result.getErrors();
-                const errorWithCode = errors.find((e) => e.type === errorType);
-                expect(errorWithCode).toBeDefined();
-            }
+            const errorWithType = getErrors(result).find(
+                (e) => e.type === errorType,
+            );
+            expect(errorWithType).toBeDefined();
         });
     });
 
@@ -173,12 +174,9 @@ defineFeature(feature, (test) => {
         and(
             /^the failure contains error codes "(.*)" and "(.*)"$/,
             (errorCode1: string, errorCode2: string) => {
-                if (result.isFailure()) {
-                    const errors = result.getErrors();
-                    const codes = errors.map((e) => e.code);
-                    expect(codes).toContain(errorCode1);
-                    expect(codes).toContain(errorCode2);
-                }
+                const codes = getErrors(result).map((e) => e.code);
+                expect(codes).toContain(errorCode1);
+                expect(codes).toContain(errorCode2);
             },
         );
     });
@@ -215,7 +213,7 @@ defineFeature(feature, (test) => {
         });
     });
 
-    test('Converting Zod SafeParseResult to PureResult - Failure', ({
+    test('Converting a failed SafeParseResult maps each issue to a structured error', ({
         given,
         when,
         then,
@@ -252,31 +250,15 @@ defineFeature(feature, (test) => {
             expect(result.isFailure()).toBe(true);
         });
 
-        and(
-            /^the failure contains a single error with code "(.*)"$/,
-            (errorCode: string) => {
-                if (result.isFailure()) {
-                    const errors = result.getErrors();
-                    expect(errors).toHaveLength(1);
-                    expect(errors[0].code).toBe(errorCode);
-                }
-            },
-        );
+        and(/^the failure contains (\d+) errors$/, (issueCount: string) => {
+            expect(getErrors(result)).toHaveLength(parseInt(issueCount, 10));
+        });
 
-        and(
-            /^the error data contains a count of (.*)$/,
-            (issueCount: string) => {
-                if (result.isFailure()) {
-                    const errors = result.getErrors();
-                    const count = parseInt(
-                        (errors[0].data as Record<string, unknown>)
-                            ?.count as string,
-                        10,
-                    );
-                    expect(count).toBe(parseInt(issueCount, 10));
-                }
-            },
-        );
+        and(/^every error has code "(.*)"$/, (errorCode: string) => {
+            for (const error of getErrors(result)) {
+                expect(error.code).toBe(errorCode);
+            }
+        });
     });
 
     test('Converting Zod SafeParseResult with custom error', ({
@@ -318,19 +300,15 @@ defineFeature(feature, (test) => {
         and(
             /^the failure contains a single error with code "(.*)"$/,
             (errorCode: string) => {
-                if (result.isFailure()) {
-                    const errors = result.getErrors();
-                    expect(errors).toHaveLength(1);
-                    expect(errors[0].code).toBe(errorCode);
-                }
+                const errors = getErrors(result);
+                expect(errors).toHaveLength(1);
+                expect(errors[0].code).toBe(errorCode);
             },
         );
 
         and(/^the error data is (.*)$/, (data: string) => {
-            if (result.isFailure()) {
-                const errors = result.getErrors();
-                expect(errors[0].data).toEqual(JSON.parse(data));
-            }
+            const errors = getErrors(result);
+            expect(errors[0].data).toEqual(JSON.parse(data));
         });
     });
 
@@ -370,6 +348,13 @@ defineFeature(feature, (test) => {
 //>───────────────────────────────────────────────────────────────────────────────<
 //> en: Utility functions for creating Zod schemas from strings.                  <
 //>───────────────────────────────────────────────────────────────────────────────<
+
+function getErrors(result: Result<unknown>) {
+    if (!result.isFailure()) {
+        throw new Error('Expected a Failure result');
+    }
+    return result.getErrors();
+}
 
 function parseFieldDefinitions(fields: string): Record<string, z.ZodTypeAny> {
     const fieldPairs = fields.split(',');

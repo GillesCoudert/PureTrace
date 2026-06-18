@@ -18,49 +18,40 @@ export function pureZodParse<T extends z.ZodObject<any>>(
     return convertZodParseResultToPureResult(contract.safeParse(data));
 }
 
+//>
+//> > fr: Champs d'issue exclus de `data` : `code` (remonté en code) et `input` (secrets/PII).
+//> > en: Issue fields excluded from `data`: `code` (lifted to code) and `input` (secrets/PII).
+//>
+const nonDataIssueKeys = new Set<string>(['code', 'input']);
+
 export function convertZodParseResultToPureResult<TOutput>(
     result: z.ZodSafeParseResult<TOutput>,
 ): Result<TOutput> {
     if (result.success) {
         return new Success(result.data);
-    } else {
-        const errorMessages: PureError[] = [];
-        let zodGenericErrorCount = 0;
-        //>
-        //> > fr: Une erreur Zod est constituée de plusieurs erreurs.
-        //> > en: A Zod error consists of multiple issues.
-        //>
-        for (const issue of result.error.issues) {
-            if (issue.code === 'custom') {
-                errorMessages.push(
-                    generateError({
-                        type: 'processError',
-                        code: issue.message,
-                        data: issue.params,
-                    }),
-                );
-            } else {
-                zodGenericErrorCount++;
-            }
-        }
-        //>
-        //> > fr: Génération d'une erreur générique si nécessaire.
-        //> > en: Generating a generic error if necessary.
-        //>
-        if (zodGenericErrorCount > 0) {
-            errorMessages.push(
-                generateError({
-                    type: 'processError',
-                    code: 'zodParseFailed',
-                    data: {
-                        count: zodGenericErrorCount.toString(),
-                        zodError: result.error.stack ?? '',
-                    },
-                }),
-            );
-        }
-        return new Failure(errorMessages);
     }
+    return new Failure(
+        result.error.issues.map((issue) => {
+            if (issue.code === 'custom') {
+                return generateError({
+                    type: 'processError',
+                    code: issue.message,
+                    data: serializeUnknown(issue.params),
+                });
+            }
+            const details: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(issue)) {
+                if (!nonDataIssueKeys.has(key)) {
+                    details[key] = value;
+                }
+            }
+            return generateError({
+                type: 'processError',
+                code: issue.code,
+                data: serializeUnknown(details),
+            });
+        }),
+    );
 }
 
 //#────────────────────────────────────────────────────────────────────────────#
@@ -78,7 +69,7 @@ export interface SerializeUnknownOptions {
     maxDepth?: number;
 }
 
-const DEFAULT_MAX_DEPTH = 10;
+const defaultMaxDepth = 10;
 
 /**
  * Serializes any unknown value into a Json-safe representation, never throwing.
@@ -121,7 +112,7 @@ export function serializeUnknown(
     value: unknown,
     options: SerializeUnknownOptions = {},
 ): Json {
-    const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
+    const maxDepth = options.maxDepth ?? defaultMaxDepth;
     try {
         return serializeRecursive(value, maxDepth, new WeakSet());
     } catch {

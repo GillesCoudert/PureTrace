@@ -390,11 +390,11 @@ pureZodParse<T extends z.ZodObject<any>>(
 - On **success**: returns `Success<T>` with validated data
 - On **failure**: returns `Failure` with structured errors
 
-**PureError handling:**
+**PureError handling:** each Zod issue maps to one structured `PureError` of type `processError`.
 
--- **Generic Zod errors** (type mismatch, missing fields, etc.) are aggregated into a single PureError with code `zodParseFailed` and type `processError`. The error data contains: - `count`: number of issues - `zodError`: stack trace for debugging
+- **Standard Zod issues** (type mismatch, `min`/`max`, format, missing fields…) use the Zod issue `code` as the PureError `code` (e.g. `invalid_type`, `too_small`, `invalid_format`). The `data` preserves the issue context — `path`, `message`, and code-specific fields such as `expected`, `minimum`, or `format` — but never the rejected `input` (which may carry secrets/PII).
 
--- **Custom errors** (from `.refine()` or `.superRefine()`) preserve their `message` as the PureError `code` and `params` as the PureError `data`
+- **Custom errors** (from `.refine()` or `.superRefine()`) preserve their `message` as the PureError `code` and `params` as the PureError `data`
 
 **Example:**
 
@@ -414,8 +414,10 @@ const result = pureZodParse({ username: 'ab', age: 15 }, schema);
 
 if (result.isFailure()) {
     const errors = result.getErrors();
-    // errors[0]: { code: 'userTooYoung', type: 'processError', data: { minAge: 18 } } // PureError
-    // errors[1]: { code: 'zodParseFailed', type: 'processError', data: { count: '1', zodError: '...' } } // PureError
+    // errors[0]: { code: 'too_small', type: 'processError',
+    //             data: { origin: 'string', minimum: 3, inclusive: true,
+    //                     path: ['username'], message: 'Too small: ...' } } // PureError
+    // errors[1]: { code: 'userTooYoung', type: 'processError', data: { minAge: 18 } } // PureError
 }
 ```
 
