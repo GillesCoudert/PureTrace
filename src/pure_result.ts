@@ -6,7 +6,7 @@ import {
     PureErrorInput,
     NativeErrorType,
     PureErrorParameters,
-} from './pure_message';
+} from './pure_message.js';
 
 /** Normalizes a single item or a list into a readonly array. */
 function toArray<T>(input: T | readonly T[]): readonly T[] {

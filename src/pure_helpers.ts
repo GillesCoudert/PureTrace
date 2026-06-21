@@ -1,5 +1,5 @@
 import z from 'zod';
-import { Failure, Result, Success } from './pure_result';
+import { Failure, Result, Success } from './pure_result.js';
 import {
     Json,
     JsonObject,
@@ -8,7 +8,7 @@ import {
     errorSchema,
     generateError,
     messageSchema,
-} from './pure_message';
+} from './pure_message.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function pureZodParse<T extends z.ZodObject<any>>(

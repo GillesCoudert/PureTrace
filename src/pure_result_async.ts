@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-import { serializeUnknown } from './pure_helpers';
+import { serializeUnknown } from './pure_helpers.js';
 import {
     PureMessage,
     PureError,
     PureMessageInput,
     NativeErrorType,
     PureErrorParameters,
-} from './pure_message';
-import { Success, Failure, generateFailure, Result } from './pure_result';
+} from './pure_message.js';
+import { Success, Failure, generateFailure, Result } from './pure_result.js';
 
 export type ResultAsyncValue<S> = PromiseLike<Result<S>>;
 

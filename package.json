@@ -6,8 +6,20 @@
     "publishConfig": {
         "access": "public"
     },
-    "main": "lib/index.js",
-    "types": "lib/index.d.ts",
+    "type": "module",
+    "main": "./lib/index.js",
+    "types": "./lib/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./lib/index.d.ts",
+            "default": "./lib/index.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "sideEffects": false,
+    "engines": {
+        "node": ">=20.19.0"
+    },
     "files": [
         "lib",
         "docs",
@@ -16,7 +28,7 @@
     "scripts": {
         "prebuild": "node -e \"require('fs').rmSync('lib', { recursive: true, force: true })\"",
         "build": "tsc -p tsconfig.build.json",
-        "test": "jest --runInBand",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
         "lint": "eslint src/**/*.ts"
     },
     "repository": {
