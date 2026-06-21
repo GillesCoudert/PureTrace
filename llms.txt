@@ -150,6 +150,21 @@ console.log(result.getTraces()); // [{ kind: 'metric', type: 'start', code: 'fet
 Traces propagate automatically through `chainSuccess`, `mapSuccess`, etc.
 You do not need to manually forward them.
 
+Separation of concerns: `map*` transforms the value/errors only (it returns the raw
+`S2` / `PureError[]`, the library re-wraps), and `trace*` enriches with traces —
+non-destructively and chainably. Do not fold trace injection into a `map`:
+
+```typescript
+// enrich without transforming — chainable, non-destructive
+result.trace(infoMessage); // both branches
+parsed.traceFailure([validationWarning]); // failure branch only
+loaded.traceSuccess(auditMessage); // success branch only
+```
+
+`addTraces`/`addErrors` still mutate in place (returning `void`); reach for `trace*`
+when you want to stay in the functional chain. Every `trace*` accepts a single message
+or a list.
+
 ### ResultAsync<S> — Async operations
 
 `ResultAsync<S>` wraps an asynchronous `Result` computation with the same combinators
@@ -183,7 +198,7 @@ const fromPromise = ResultAsync.fromPromise(
 function loadUserProfile(id: string): ResultAsync<Profile> {
     return ResultAsync.liftSuccess(id)
         .chainSuccess((userId) => fetchUserById(userId))
-        .mapSuccess((user) => new Success(toProfile(user)));
+        .mapSuccess((user) => toProfile(user));
 }
 ```
 
@@ -288,7 +303,8 @@ const result = fetchUser(id)
 ### Recovering from failures
 
 ```typescript
-// Convert Failure to Success with a default
+// Convert Failure to Success with a default (errors/traces are kept as traces).
+// The default's type sets the success type, so it works on any Result<S>.
 const result = riskyOperation().convertFailureToSuccess(defaultValue);
 
 // Or use chainFailure for conditional recovery

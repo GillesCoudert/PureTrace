@@ -2,9 +2,16 @@ import {
     PureError,
     generateError,
     PureMessage,
+    PureMessageInput,
+    PureErrorInput,
     NativeErrorType,
     PureErrorParameters,
 } from './pure_message';
+
+/** Normalizes a single item or a list into a readonly array. */
+function toArray<T>(input: T | readonly T[]): readonly T[] {
+    return Array.isArray(input) ? (input as readonly T[]) : [input as T];
+}
 
 /**
  * Represents the result of an operation, which can be either a Success or a Failure.
@@ -17,8 +24,8 @@ abstract class PureResult<S> {
      * Constructs a new PureResult instance.
      * @param traces - Optional PureMessages to associate with the result.
      */
-    constructor(traces?: readonly PureMessage[]) {
-        if (traces?.length) {
+    constructor(traces?: PureMessageInput) {
+        if (traces) {
             this.addTraces(traces);
         }
     }
@@ -41,12 +48,12 @@ abstract class PureResult<S> {
      * Adds trace messages to this result.
      * @param traces - The trace messages to add.
      */
-    public addTraces(traces: readonly PureMessage[]): void {
+    public addTraces(traces: PureMessageInput): void {
         //>
         //> > fr: Pas de validation runtime : confiance au typage en interne.
         //> > en: No runtime validation: internal callers are trusted via types.
         //>
-        this.traces.push(...traces);
+        this.traces.push(...toArray(traces));
     }
 
     /**
@@ -55,7 +62,28 @@ abstract class PureResult<S> {
      * @param ambient - Trace messages to append after this result's own messages.
      * @returns A new result enriched with the ambient traces.
      */
-    public abstract cloneWithTraces(ambient: readonly PureMessage[]): Result<S>;
+    public abstract cloneWithTraces(ambient: PureMessageInput): Result<S>;
+
+    /**
+     * Non-destructive, chainable trace enrichment. Returns a new result of the
+     * same variant with the given traces appended. Alias façade over
+     * {@link cloneWithTraces} for an intent-revealing name in chains.
+     */
+    public trace(traces: PureMessageInput): Result<S> {
+        return this.cloneWithTraces(traces);
+    }
+
+    /**
+     * Like {@link trace} but only enriches a `Success`; a `Failure` is returned
+     * unchanged. Non-destructive.
+     */
+    public abstract traceSuccess(traces: PureMessageInput): Result<S>;
+
+    /**
+     * Like {@link trace} but only enriches a `Failure`; a `Success` is returned
+     * unchanged. Non-destructive.
+     */
+    public abstract traceFailure(traces: PureMessageInput): Result<S>;
 
     //#────────────────────────────────────────────────────────────────────────────#
     //#endregion                         TRACE MANAGEMENT                          #
@@ -117,14 +145,14 @@ abstract class PureResult<S> {
      * @param f - The function to apply to the success value.
      * @returns A new Result with the mapped success value.
      */
-    abstract mapSuccess<S2>(f: (value: S) => Success<S2>): Result<S2>;
+    abstract mapSuccess<S2>(f: (value: S) => S2): Result<S2>;
 
     /**
      * Maps the failure messages using the provided function.
      * @param f - The function to apply to the failure messages.
      * @returns A new Result with the mapped failure messages.
      */
-    abstract mapFailure(f: (errors: PureMessage[]) => Failure): Result<S>;
+    abstract mapFailure(f: (errors: PureError[]) => PureError[]): Result<S>;
 
     /**
      * Maps both success and failure values using the provided functions.
@@ -133,8 +161,8 @@ abstract class PureResult<S> {
      * @returns A new Result with the mapped values.
      */
     abstract mapBoth<S2>(
-        onSuccess: (value: S) => Success<S2>,
-        onFailure: (errors: PureMessage[]) => Failure,
+        onSuccess: (value: S) => S2,
+        onFailure: (errors: PureError[]) => PureError[],
     ): Result<S2>;
 
     //#endregion ───── FUNCTORS ─────
@@ -169,11 +197,12 @@ abstract class PureResult<S> {
     ): Result<S2 | S3>;
 
     /**
-     * Converts a failure to a success with a default value.
-     * @param defaultValue - The default value to use for the success.
-     * @returns A Success instance with the default value.
+     * Recovers a failure into `Success(defaultValue)`; a success is returned
+     * unchanged. Generic on the default's type so it stays callable on a
+     * `Result<S>`, where `Failure`'s success type is `never`.
+     * @param defaultValue - Value used when the result is a failure.
      */
-    abstract convertFailureToSuccess(defaultValue: S): Success<S>;
+    abstract convertFailureToSuccess<T>(defaultValue: T): Success<S | T>;
 
     //#endregion ───── MONADS ─────
 
@@ -215,7 +244,7 @@ export class Success<S> extends PureResult<S> {
      */
     constructor(
         public readonly value: S,
-        traces?: readonly PureMessage[],
+        traces?: PureMessageInput,
     ) {
         super(traces);
     }
@@ -224,8 +253,16 @@ export class Success<S> extends PureResult<S> {
      * Returns a new Success with the same value, this result's own traces,
      * then the given ambient traces.
      */
-    public cloneWithTraces(ambient: readonly PureMessage[]): Result<S> {
-        return new Success(this.value, [...this.traces, ...ambient]);
+    public cloneWithTraces(ambient: PureMessageInput): Result<S> {
+        return new Success(this.value, [...this.traces, ...toArray(ambient)]);
+    }
+
+    public traceSuccess(traces: PureMessageInput): Result<S> {
+        return this.cloneWithTraces(traces);
+    }
+
+    public traceFailure(_: PureMessageInput): Result<S> {
+        return this;
     }
 
     //#────────────────────────────────────────────────────────────────────────────#
@@ -296,8 +333,8 @@ export class Success<S> extends PureResult<S> {
      * @param f Function to apply to the success value.
      * @returns A new Result with the mapped value.
      */
-    public mapSuccess<S2>(f: (value: S) => Success<S2>): Result<S2> {
-        return f(this.value).cloneWithTraces(this.traces);
+    public mapSuccess<S2>(f: (value: S) => S2): Result<S2> {
+        return new Success(f(this.value), this.traces);
     }
 
     /**
@@ -305,7 +342,7 @@ export class Success<S> extends PureResult<S> {
      * @param _ Ignored function.
      * @returns This instance.
      */
-    public mapFailure(_: (errors: PureMessage[]) => Failure): Result<S> {
+    public mapFailure(_: (errors: PureError[]) => PureError[]): Result<S> {
         return this;
     }
 
@@ -316,8 +353,8 @@ export class Success<S> extends PureResult<S> {
      * @returns A new Result with the mapped value.
      */
     public mapBoth<S2>(
-        onSuccess: (value: S) => Success<S2>,
-        _: (errors: PureMessage[]) => Failure,
+        onSuccess: (value: S) => S2,
+        _: (errors: PureError[]) => PureError[],
     ): Result<S2> {
         return this.mapSuccess(onSuccess);
     }
@@ -359,7 +396,7 @@ export class Success<S> extends PureResult<S> {
      * @param _ Ignored default value.
      * @returns This instance.
      */
-    public convertFailureToSuccess(_: S): Success<S> {
+    public convertFailureToSuccess<T>(_: T): Success<S | T> {
         return this;
     }
 
@@ -381,8 +418,8 @@ export class Failure extends PureResult<never> {
      * @param traces Optional trace messages.
      */
     constructor(
-        errors: readonly PureError[] = [],
-        traces?: readonly PureMessage[],
+        errors: PureErrorInput = [],
+        traces?: PureMessageInput,
     ) {
         super(traces);
         this.addErrors(errors);
@@ -392,8 +429,16 @@ export class Failure extends PureResult<never> {
      * Returns a new Failure with the same errors, this result's own traces,
      * then the given ambient traces.
      */
-    public cloneWithTraces(ambient: readonly PureMessage[]): Failure {
-        return new Failure(this.errors, [...this.traces, ...ambient]);
+    public cloneWithTraces(ambient: PureMessageInput): Failure {
+        return new Failure(this.errors, [...this.traces, ...toArray(ambient)]);
+    }
+
+    public traceSuccess(_: PureMessageInput): Result<never> {
+        return this;
+    }
+
+    public traceFailure(traces: PureMessageInput): Result<never> {
+        return this.cloneWithTraces(traces);
     }
 
     //#────────────────────────────────────────────────────────────────────────────#
@@ -412,12 +457,12 @@ export class Failure extends PureResult<never> {
      * Adds errors to this failure.
      * @param errors The errors to add.
      */
-    public addErrors(errors: readonly PureError[]): void {
+    public addErrors(errors: PureErrorInput): void {
         //>
         //> > fr: Pas de validation runtime : confiance au typage en interne.
         //> > en: No runtime validation: internal callers are trusted via types.
         //>
-        this.errors.push(...errors);
+        this.errors.push(...toArray(errors));
     }
 
     //#────────────────────────────────────────────────────────────────────────────#
@@ -483,17 +528,17 @@ export class Failure extends PureResult<never> {
 
     //#region    ───── FUNCTORS ─────
 
-    public mapSuccess<S2>(_: (value: never) => Success<S2>): Result<S2> {
+    public mapSuccess<S2>(_: (value: never) => S2): Result<S2> {
         return this;
     }
 
-    public mapFailure(f: (errors: PureMessage[]) => Failure): Result<never> {
-        return f(this.getErrors()).cloneWithTraces(this.traces);
+    public mapFailure(f: (errors: PureError[]) => PureError[]): Result<never> {
+        return new Failure(f(this.getErrors()), this.traces);
     }
 
     public mapBoth<S2>(
-        _: (value: never) => Success<S2>,
-        onFailure: (errors: PureMessage[]) => Failure,
+        _: (value: never) => S2,
+        onFailure: (errors: PureError[]) => PureError[],
     ): Result<S2> {
         return this.mapFailure(onFailure);
     }
@@ -519,7 +564,7 @@ export class Failure extends PureResult<never> {
         return this.chainFailure(onFailure);
     }
 
-    public convertFailureToSuccess(defaultValue: never): Success<never> {
+    public convertFailureToSuccess<T>(defaultValue: T): Success<T> {
         return new Success(defaultValue, [...this.errors, ...this.traces]);
     }
 

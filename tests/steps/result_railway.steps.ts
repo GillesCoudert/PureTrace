@@ -99,7 +99,7 @@ defineFeature(feature, (test) => {
     test('mapSuccess wraps the new value', ({ given, when, then }) => {
         givenSuccess(given);
         when(/^I mapSuccess to wrap the value plus 1$/, () => {
-            result = result.mapSuccess((value) => new Success(value + 1));
+            result = result.mapSuccess((value) => value + 1);
         });
         thenSuccessValue(then);
     });
@@ -112,7 +112,7 @@ defineFeature(feature, (test) => {
     }) => {
         givenFailure(given);
         when(/^I mapSuccess to wrap the value plus 1$/, () => {
-            result = result.mapSuccess((value) => new Success(value + 1));
+            result = result.mapSuccess((value) => value + 1);
         });
         then(/^the result is a failure$/, () => {
             expect(result.isFailure()).toBe(true);

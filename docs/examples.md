@@ -126,7 +126,7 @@ const result = await ResultAsync.fromPromise(
                         error,
                     },
                 }),
-        ).mapSuccess((profile) => new Success({ ...user, profile })),
+        ).mapSuccess((profile) => ({ ...user, profile })),
     )
     .chainSuccess((user) =>
         ResultAsync.fromPromise(
@@ -140,7 +140,7 @@ const result = await ResultAsync.fromPromise(
                         error,
                     },
                 }),
-        ).mapSuccess((permissions) => new Success({ ...user, permissions })),
+        ).mapSuccess((permissions) => ({ ...user, permissions })),
     );
 ```
 
@@ -246,16 +246,14 @@ async function fetchWithRetry<T>(
         );
 
         if (result.isSuccess()) {
-            return result.mapSuccess((value) =>
-                new Success(value, [
-                    generateMessage({
-                        kind: 'information',
-                        type: 'information',
-                        code: 'retrySucceeded',
-                        data: { attempt },
-                    }),
-                ]),
-            );
+            return result.trace([
+                generateMessage({
+                    kind: 'information',
+                    type: 'information',
+                    code: 'retrySucceeded',
+                    data: { attempt },
+                }),
+            ]);
         }
 
         lastFailure = result as Failure;
@@ -339,17 +337,15 @@ const registrationSchema = z.object({
 function registerUser(
     data: unknown,
 ): Result<{ username: string; email: string; age: number }> {
-    return pureZodParse(data, registrationSchema).mapFailure((errors) =>
-        new Failure(errors, [
-            generateMessage({
-                kind: 'information',
-                type: 'warning',
-                code: 'registrationValidationFailed',
-                data: { timestamp: Date.now() },
-                issuer: 'userService',
-            }),
-        ]),
-    );
+    return pureZodParse(data, registrationSchema).traceFailure([
+        generateMessage({
+            kind: 'information',
+            type: 'warning',
+            code: 'registrationValidationFailed',
+            data: { timestamp: Date.now() },
+            issuer: 'userService',
+        }),
+    ]);
 }
 
 const result = registerUser({ username: 'ab', email: 'bad', age: 15 });
@@ -409,7 +405,7 @@ function validateRegistration(
     return pureZodParse(data, userSchema).chainSuccess((user) =>
         checkEmailDomain(user.email)
             .chainSuccess(() => checkRolePermission(user.role))
-            .mapSuccess(() => new Success(user)),
+            .mapSuccess(() => user),
     );
 }
 
@@ -470,18 +466,16 @@ function handleApiRequest(
                     },
                 }),
             );
-            return new Failure(apiErrors);
+            return apiErrors;
         })
-        .mapSuccess((value) =>
-            new Success(value, [
-                generateMessage({
-                    kind: 'metric',
-                    type: 'start',
-                    code: 'requestValidated',
-                    data: { timestamp: Date.now() },
-                }),
-            ]),
-        );
+        .traceSuccess([
+            generateMessage({
+                kind: 'metric',
+                type: 'start',
+                code: 'requestValidated',
+                data: { timestamp: Date.now() },
+            }),
+        ]);
 }
 
 const result = handleApiRequest({ action: 'invalid', payload: {} });

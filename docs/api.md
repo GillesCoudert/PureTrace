@@ -50,22 +50,36 @@ getErrors(): PureError[] // Failure only
 
 Returns the errors (`kind: 'error'`). A shallow copy — the errors themselves are immutable.
 
+### Trace enrichment
+
+Non-destructive, chainable. Each returns a new Result; the original is untouched. Every method accepts a single `PureMessage` or a list.
+
+```ts
+trace(traces: PureMessage | readonly PureMessage[]): Result<S>        // both branches
+traceSuccess(traces: PureMessage | readonly PureMessage[]): Result<S> // success only
+traceFailure(traces: PureMessage | readonly PureMessage[]): Result<S> // failure only
+```
+
+`addTraces`/`addErrors` remain for in-place mutation (they return `void`); `trace*` is the functional, chainable counterpart — prefer it inside a chain.
+
 ### Transformations
 
 ```ts
-mapSuccess<S2>(fn: (value: S) => Success<S2>): Result<S2>
+mapSuccess<S2>(fn: (value: S) => S2): Result<S2>
 ```
 
 ```ts
-mapFailure(fn: (errors: PureError[]) => Failure): Result<S>
+mapFailure(fn: (errors: PureError[]) => PureError[]): Result<S>
 ```
 
 ```ts
 mapBoth<S2>(
-  onSuccess: (value: S) => Success<S2>,
-  onFailure: (errors: PureError[]) => Failure,
+  onSuccess: (value: S) => S2,
+  onFailure: (errors: PureError[]) => PureError[],
 ): Result<S2>
 ```
+
+`map*` only transforms — the value or the errors. The library re-wraps. Use `chain*` to sequence into another `Result`, and `trace*` (below) to enrich with traces.
 
 ### Chaining
 
@@ -87,6 +101,14 @@ chainBoth<S2, S3>(
 ```ts
 chain<S2>(fn: (result: Result<S>) => Result<S2>): Result<S2>
 ```
+
+### Recovery
+
+```ts
+convertFailureToSuccess<T>(defaultValue: T): Success<S | T>
+```
+
+Recovers a failure into `Success(defaultValue)`, carrying the failure's errors and traces over as traces; a success is returned unchanged. Generic on the default's type, so it stays callable on a `Result<S>` even though a `Failure`'s success type is `never` — e.g. `result.convertFailureToSuccess(0)` yields `Success<number>`.
 
 ### Side effects
 
@@ -120,17 +142,17 @@ Executes the appropriate function depending on the result type without transform
 ### Trace management
 
 ```ts
-addTraces(traces: readonly PureMessage[]): void
+addTraces(traces: PureMessage | readonly PureMessage[]): void
 ```
 
 ```ts
-addErrors(errors: readonly PureError[]): void // Failure only
+addErrors(errors: PureError | readonly PureError[]): void // Failure only
 ```
 
 `addTraces` and `addErrors` mutate the current instance in place (non-fluent) and perform **no runtime validation**: callers are trusted through the types. They are meant for the build phase, while you still own the result and have not handed it to the library. Validate untrusted or external input at the boundary with `pureZodParse` instead.
 
 ```ts
-cloneWithTraces(ambient: readonly PureMessage[]): Result<S>
+cloneWithTraces(ambient: PureMessage | readonly PureMessage[]): Result<S>
 ```
 
 Returns a **new** result of the same variant, carrying this result's own messages followed by the given ambient traces. Never mutates the source — this is how the library propagates traces across combinators without touching results it receives.
@@ -147,7 +169,7 @@ Constructors:
 
 ```ts
 new Success(value: S)
-new Success(value: S, traces?: readonly PureMessage[])
+new Success(value: S, traces?: PureMessage | readonly PureMessage[])
 ```
 
 ## Failure
@@ -159,7 +181,10 @@ class Failure
 Constructors:
 
 ```ts
-new Failure(errors?: readonly PureError[], traces?: readonly PureMessage[])
+new Failure(
+  errors?: PureError | readonly PureError[],
+  traces?: PureMessage | readonly PureMessage[],
+)
 ```
 
 ## ResultAsync&lt;S&gt;

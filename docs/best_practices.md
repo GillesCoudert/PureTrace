@@ -73,7 +73,7 @@ Best Practices
 - Never use try/catch in business logic.
 - Do not handle errors as plain strings or loose objects.
 - Do not create wrapper functions that add no value (e.g., a function that just calls `GetResult.fromResultArray` on a local list).
-- Do not use identity transformations: `mapSuccess(() => value)` or `mapSuccess(() => new Success(value))` are no-ops and should be removed.
+- Do not use identity transformations: `mapSuccess((v) => v)` is a no-op and should be removed. To enrich a result with traces without transforming it, use `trace`/`traceSuccess`/`traceFailure`, not a `map`.
 - Do not over-abstract: prefer direct usage of combinators (`GetResult.fromResultArray`, `chainSuccess`, etc.) over creating intermediate utility functions, unless they encapsulate domain logic or are reused in multiple places.
 - Avoid builder functions that only delegate to a single combinator without adding domain semantics.
 

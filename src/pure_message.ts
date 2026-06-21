@@ -53,6 +53,12 @@ export const errorSchema = messageSchema.extend({
  */
 export type PureError = z.infer<typeof errorSchema>;
 
+/** A single PureMessage or a list of them, accepted interchangeably. */
+export type PureMessageInput = PureMessage | readonly PureMessage[];
+
+/** A single PureError or a list of them, accepted interchangeably. */
+export type PureErrorInput = PureError | readonly PureError[];
+
 //#────────────────────────────────────────────────────────────────────────────#
 //#region                              COMMON TYPES                            #
 //#────────────────────────────────────────────────────────────────────────────#
@@ -289,5 +295,4 @@ export function generateMessage<
 //#endregion ───── MESSAGES ─────
 
 //#────────────────────────────────────────────────────────────────────────────#
-//#endregion                      MESSAGE REGISTRY                            #
-//#────────────────────────────────────────────────────────────────────────────#
+//#endregion   

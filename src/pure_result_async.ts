@@ -2,6 +2,8 @@
 import { serializeUnknown } from './pure_helpers';
 import {
     PureMessage,
+    PureError,
+    PureMessageInput,
     NativeErrorType,
     PureErrorParameters,
 } from './pure_message';
@@ -97,11 +99,14 @@ export interface ResultAsync<S> extends PromiseLike<Result<S>> {
         onSuccess: (success: Success<S>) => void,
         onFailure: (failure: Failure) => void,
     ): ResultAsync<S>;
-    mapSuccess<S2>(onSuccess: (value: S) => Success<S2>): ResultAsync<S2>;
-    mapFailure(onFailure: (errors: PureMessage[]) => Failure): ResultAsync<S>;
+    trace(traces: PureMessageInput): ResultAsync<S>;
+    traceSuccess(traces: PureMessageInput): ResultAsync<S>;
+    traceFailure(traces: PureMessageInput): ResultAsync<S>;
+    mapSuccess<S2>(onSuccess: (value: S) => S2): ResultAsync<S2>;
+    mapFailure(onFailure: (errors: PureError[]) => PureError[]): ResultAsync<S>;
     mapBoth<S2>(
-        onSuccess: (value: S) => Success<S2>,
-        onFailure: (errors: PureMessage[]) => Failure,
+        onSuccess: (value: S) => S2,
+        onFailure: (errors: PureError[]) => PureError[],
     ): ResultAsync<S2>;
     chain<S2>(
         next: (result: Result<S>) => PromiseLike<Result<S2>>,
@@ -176,14 +181,32 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
         );
     }
 
-    mapSuccess<S2>(onSuccess: (value: S) => Success<S2>): ResultAsync<S2> {
+    trace(traces: PureMessageInput): ResultAsync<S> {
+        return ResultAsync(async ({ liftResult }) =>
+            liftResult((await this.resolve()).trace(traces)),
+        );
+    }
+
+    traceSuccess(traces: PureMessageInput): ResultAsync<S> {
+        return ResultAsync(async ({ liftResult }) =>
+            liftResult((await this.resolve()).traceSuccess(traces)),
+        );
+    }
+
+    traceFailure(traces: PureMessageInput): ResultAsync<S> {
+        return ResultAsync(async ({ liftResult }) =>
+            liftResult((await this.resolve()).traceFailure(traces)),
+        );
+    }
+
+    mapSuccess<S2>(onSuccess: (value: S) => S2): ResultAsync<S2> {
         return ResultAsync(async (helpers) => {
             const result = await this.resolve();
             return helpers.liftResult(result.mapSuccess(onSuccess));
         });
     }
 
-    mapFailure(onFailure: (errors: PureMessage[]) => Failure): ResultAsync<S> {
+    mapFailure(onFailure: (errors: PureError[]) => PureError[]): ResultAsync<S> {
         return ResultAsync(async (helpers) => {
             const result = await this.resolve();
             if (result.isFailure()) {
@@ -194,8 +217,8 @@ class ResultAsyncImpl<S> implements ResultAsync<S> {
     }
 
     mapBoth<S2>(
-        onSuccess: (value: S) => Success<S2>,
-        onFailure: (errors: PureMessage[]) => Failure,
+        onSuccess: (value: S) => S2,
+        onFailure: (errors: PureError[]) => PureError[],
     ): ResultAsync<S2> {
         return ResultAsync(async (helpers) => {
             const result = await this.resolve();
