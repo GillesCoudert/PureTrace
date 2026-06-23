@@ -4,7 +4,7 @@ import { Result, Success } from '../../src/pure_result';
 const feature = loadFeature('tests/features/native_success.feature');
 
 defineFeature(feature, (test) => {
-    test('Tap idempotency', ({ given, when, then, and }) => {
+    test('Tap idempotency', ({ given, when, and }) => {
         let result: Result<number | string | boolean>;
         given(/^a success with the value (.*) of type (.*)$/, (arg0, arg1) => {
             switch (arg1) {

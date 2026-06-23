@@ -29,7 +29,7 @@
         "prebuild": "node -e \"require('fs').rmSync('lib', { recursive: true, force: true })\"",
         "build": "tsc -p tsconfig.build.json",
         "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
-        "lint": "eslint src/**/*.ts"
+        "lint": "eslint ."
     },
     "repository": {
         "type": "git",
