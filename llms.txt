@@ -134,8 +134,9 @@ This is a **compile-time** constraint only. A raw `PureMessage` keeps an open `k
 ### Traces
 
 Both `Success` and `Failure` carry an ordered list of `PureMessage` traces.
-Traces are observability metadata — they propagate through chains and transformations,
-allowing you to reconstruct the full execution path.
+Traces are an audit trail — not merely observability metadata, but an ordered record
+kept at whatever level of exhaustiveness you need. They propagate through chains and
+transformations, letting you reconstruct the full execution path.
 
 ```typescript
 import { Success, generateMessage } from '@gilles-coudert/pure-trace';
