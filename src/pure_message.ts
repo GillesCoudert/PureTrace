@@ -1,10 +1,22 @@
 import z from 'zod';
 
 /**
- * Zod schema for a BCP 47 locale identifier.
- * Accepts formats like 'fr', 'en-US', 'ja-JP'.
+ * Zod schema for a well-formed BCP 47 language tag.
+ * Validated through `Intl.Locale`, so it checks structural well-formedness
+ * (not subtag existence): script, 3-letter language and M49 region subtags pass.
+ * Accepts e.g. 'fr', 'en-US', 'zh-Hant', 'fil', 'es-419'; rejects 'fr_FR', '123', ''.
  */
-export const localeSchema = z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/);
+export const localeSchema = z.string().refine(
+    (tag) => {
+        try {
+            new Intl.Locale(tag);
+            return true;
+        } catch {
+            return false;
+        }
+    },
+    { error: 'Invalid BCP 47 locale tag' },
+);
 
 /**
  * Represents a BCP 47 locale identifier.
