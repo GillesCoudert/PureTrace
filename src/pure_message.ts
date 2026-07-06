@@ -76,37 +76,15 @@ export type PureErrorInput = PureError | readonly PureError[];
 //#────────────────────────────────────────────────────────────────────────────#
 
 /**
- * Represents any valid JSON value.
- *
- * This type captures all possible JSON data types:
- * - Primitives: null, boolean, number, string
- * - Structures: arrays and objects
- *
- * The type is recursive to support nested JSON structures of arbitrary depth.
- * It is structurally identical to Zod's `JSONType` (the inferred type of `z.json()`),
- * which means values of this type are interchangeable with Zod JSON schemas without
- * casts. `undefined` is intentionally excluded since it is not a valid JSON value
- * (`JSON.stringify` drops `undefined` properties).
+ * Any valid JSON value. Derived from `z.json()` so it stays in sync with Zod's
+ * JSON type; `undefined` is excluded (not a valid JSON value).
  *
  * @example
  * ```typescript
- * const simpleValue: Json = 'hello';
- * const numberValue: Json = 42;
- * const arrayValue: Json = [1, 2, 'three'];
- * const objectValue: Json = { name: 'John', age: 30, active: true };
- * const nestedValue: Json = {
- *   user: { name: 'John', contacts: ['email', 'phone'] },
- *   metadata: null
- * };
+ * const value: Json = { name: 'John', tags: ['a', 'b'], active: true, meta: null };
  * ```
  */
-export type Json =
-    | null
-    | boolean
-    | number
-    | string
-    | Json[]
-    | { [key: string]: Json };
+export type Json = z.infer<ReturnType<typeof z.json>>;
 
 /**
  * Represents a plain JSON object with string keys and JSON values.
@@ -307,4 +285,4 @@ export function generateMessage<
 //#endregion ───── MESSAGES ─────
 
 //#────────────────────────────────────────────────────────────────────────────#
-//#endregion   
+//#endregion

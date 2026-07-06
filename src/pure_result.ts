@@ -599,7 +599,7 @@ export class GetResult {
      */
     public static fromThrowable<X>(
         functionToAudit: () => X,
-        onFailure: (catchedError: unknown) => Failure,
+        onFailure: (caughtError: unknown) => Failure,
     ): Result<X> {
         try {
             return new Success<X>(functionToAudit());
