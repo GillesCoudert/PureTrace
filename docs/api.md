@@ -42,7 +42,7 @@ isFailure(): boolean
 getTraces(): PureMessage[]
 ```
 
-Returns the trace messages, in order. A shallow copy — the messages themselves are immutable.
+Returns the trace messages as an unordered collection. A shallow copy — the messages themselves are immutable.
 
 ```ts
 getErrors(): PureError[] // Failure only

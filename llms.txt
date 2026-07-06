@@ -133,18 +133,18 @@ This is a **compile-time** constraint only. A raw `PureMessage` keeps an open `k
 
 ### Traces
 
-Both `Success` and `Failure` carry an ordered list of `PureMessage` traces.
-Traces are an audit trail — not merely observability metadata, but an ordered record
-kept at whatever level of exhaustiveness you need. They propagate through chains and
-transformations, letting you reconstruct the full execution path.
+Both `Success` and `Failure` carry a list of `PureMessage` traces — an audit trail
+accumulated at whatever level of exhaustiveness you need. The list is an unordered bag:
+array position carries no guarantee (aggregation merges traces from results that may run
+concurrently). If you need a chronology, stamp each message (for example
+`data: { timestamp: Date.now() }`) and sort when you read it.
 
 ```typescript
 import { Success, generateMessage } from '@gilles-coudert/pure-trace';
 
-const result = new Success(42);
-result.addTraces([
+const result = new Success(42).trace(
     generateMessage({ kind: 'metric', type: 'start', code: 'fetchUser', data: new Date().toISOString() }),
-]);
+);
 console.log(result.getTraces()); // [{ kind: 'metric', type: 'start', code: 'fetchUser', ... }]
 ```
 
